@@ -14,6 +14,8 @@ create table if not exists registrations (
   question_for_steven text not null,
   location text not null,
   access_token uuid default uuid_generate_v4() unique not null,
+  seat_number integer,
+  role text default 'viewer' check (role in ('viewer', 'host')),
   created_at timestamp with time zone default now()
 );
 

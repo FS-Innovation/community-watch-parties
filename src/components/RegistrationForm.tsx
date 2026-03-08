@@ -28,6 +28,7 @@ export default function RegistrationForm() {
   >("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [accessToken, setAccessToken] = useState("");
+  const [seatNumber, setSeatNumber] = useState<number | null>(null);
 
   function handleChange(
     e: React.ChangeEvent<
@@ -56,6 +57,7 @@ export default function RegistrationForm() {
 
       const data = await res.json();
       setAccessToken(data.token);
+      setSeatNumber(data.seatNumber || null);
       setStatus("success");
     } catch (err) {
       setStatus("error");
@@ -70,9 +72,15 @@ export default function RegistrationForm() {
       <div className="glass-panel rounded-2xl p-8 text-center animate-fade-in max-w-lg mx-auto">
         <div className="text-4xl mb-4">🎬</div>
         <h2 className="text-2xl font-bold mb-2">You&apos;re in.</h2>
+        {seatNumber && (
+          <p className="text-[var(--doac-orange)] text-lg font-semibold mb-2">
+            Seat #{seatNumber}
+          </p>
+        )}
         <p className="text-[var(--doac-text-muted)] mb-6">
-          Check your email for your unique access link. See you at the
-          screening.
+          {seatNumber
+            ? `You've been assigned Seat #${seatNumber}. When the show starts, you'll be automatically placed in your seat.`
+            : "Check your email for your unique access link. See you at the screening."}
         </p>
         {accessToken && (
           <Link

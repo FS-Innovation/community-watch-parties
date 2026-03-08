@@ -26,9 +26,14 @@ export async function POST(request: NextRequest) {
 
   const accessToken = uuidv4();
 
+  // Host emails — add emails here that should get host privileges
+  const HOST_EMAILS = (process.env.HOST_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const role = HOST_EMAILS.includes(email.toLowerCase()) ? "host" : "viewer";
+
   // If Supabase is not configured, return demo success
   if (!hasSupabase) {
-    return NextResponse.json({ success: true, token: accessToken });
+    const demoSeat = Math.floor(Math.random() * 300) + 1;
+    return NextResponse.json({ success: true, token: accessToken, seatNumber: demoSeat, role });
   }
 
   const { createServerSupabase } = await import("@/lib/supabase");
@@ -60,6 +65,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Assign next seat number
+  const { data: maxSeatRow } = await supabase
+    .from("registrations")
+    .select("seat_number")
+    .order("seat_number", { ascending: false })
+    .limit(1)
+    .single();
+  const seatNumber = (maxSeatRow?.seat_number ?? 0) + 1;
+
   const { error: insertError } = await supabase
     .from("registrations")
     .insert({
@@ -70,6 +84,8 @@ export async function POST(request: NextRequest) {
       question_for_steven,
       location,
       access_token: accessToken,
+      seat_number: seatNumber,
+      role,
     });
 
   if (insertError) {
@@ -106,5 +122,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ success: true, token: accessToken });
+  return NextResponse.json({ success: true, token: accessToken, seatNumber, role });
 }

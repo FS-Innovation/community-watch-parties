@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import ChatPanel from "@/components/ChatPanel";
 import ScreenControls from "@/components/ScreenControls";
 import CreatorFeeds from "@/components/CreatorFeeds";
+import StageAudio from "@/components/StageAudio";
 
 const Auditorium3D = dynamic(() => import("@/components/Auditorium3D"), {
   ssr: false,
@@ -33,6 +34,8 @@ interface UserData {
   id: string;
   name: string;
   email: string;
+  seatNumber?: number;
+  role?: "host" | "viewer";
 }
 
 export default function WatchRoom() {
@@ -48,6 +51,10 @@ export default function WatchRoom() {
   const [leftSideVideo, setLeftSideVideo] = useState<HTMLVideoElement | null>(null);
   const [rightSideVideo, setRightSideVideo] = useState<HTMLVideoElement | null>(null);
   const [viewerCount] = useState(Math.floor(Math.random() * 180) + 47);
+  const [showLive, setShowLive] = useState(false);
+  const auditoriumRef = useRef<HTMLDivElement>(null);
+
+  const isHost = user?.role === "host";
 
   useEffect(() => {
     async function verify() {
@@ -64,6 +71,60 @@ export default function WatchRoom() {
       } catch { setStatus("denied"); }
     }
     verify();
+  }, [token]);
+
+  // Poll show status
+  useEffect(() => {
+    if (status !== "authorized") return;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/show-status");
+        const data = await res.json();
+        setShowLive(data.showLive);
+      } catch { /* ignore */ }
+    };
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [status]);
+
+  // When entering cinema during live show, auto-seat after a short delay
+  useEffect(() => {
+    if (room !== "cinema" || !showLive || !user?.seatNumber) return;
+    const timer = setTimeout(() => {
+      const mount = auditoriumRef.current?.querySelector("[data-auditorium]") || auditoriumRef.current?.firstElementChild;
+      const el = mount as HTMLElement & { __autoSeat?: (n: number) => void };
+      el?.__autoSeat?.(user.seatNumber!);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [room, showLive, user?.seatNumber]);
+
+  // Sync showLive to Auditorium3D
+  useEffect(() => {
+    if (room !== "cinema") return;
+    const timer = setTimeout(() => {
+      const mount = auditoriumRef.current?.querySelector("[data-auditorium]") || auditoriumRef.current?.firstElementChild;
+      const el = mount as HTMLElement & { __setShowLive?: (v: boolean) => void };
+      el?.__setShowLive?.(showLive);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [room, showLive]);
+
+  const handleLeaveSeat = useCallback(() => {
+    setRoom("lobby");
+    setIsSeated(false);
+  }, []);
+
+  const toggleShow = useCallback(async (action: "start" | "stop") => {
+    try {
+      const res = await fetch("/api/show-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, token }),
+      });
+      const data = await res.json();
+      setShowLive(data.showLive);
+    } catch { /* ignore */ }
   }, [token]);
 
   if (status === "loading") {
@@ -108,6 +169,12 @@ export default function WatchRoom() {
             <span className="text-xs text-white/40">Lounge</span>
           </div>
           <div className="flex items-center gap-4 pointer-events-auto">
+            {showLive && (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs text-red-300 font-medium">LIVE NOW</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <span className="text-xs text-white/60">
@@ -117,6 +184,12 @@ export default function WatchRoom() {
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500" />
               <span className="text-xs text-white/60">{user?.name}</span>
+              {user?.seatNumber && (
+                <span className="text-xs text-[var(--doac-orange)]">Seat #{user.seatNumber}</span>
+              )}
+              {isHost && (
+                <span className="px-2 py-0.5 rounded-full bg-[var(--doac-orange)]/20 text-[10px] text-[var(--doac-orange)] font-semibold uppercase">Host</span>
+              )}
             </div>
           </div>
         </header>
@@ -127,12 +200,15 @@ export default function WatchRoom() {
   // ─── CINEMA ───
   return (
     <main className="h-screen w-screen overflow-hidden bg-[#050510] relative">
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0" ref={auditoriumRef}>
         <Auditorium3D
           onSit={setIsSeated}
           videoElement={videoElement}
           leftSideVideo={leftSideVideo}
           rightSideVideo={rightSideVideo}
+          assignedSeat={user?.seatNumber}
+          showLive={showLive}
+          onLeaveSeat={handleLeaveSeat}
         />
       </div>
 
@@ -141,14 +217,22 @@ export default function WatchRoom() {
         <div className="flex items-center gap-3 pointer-events-auto">
           <span className="text-xs tracking-[0.2em] uppercase text-[var(--doac-orange)] font-semibold">DOAC</span>
           <span className="text-xs text-white/40">Cinema</span>
-          <button
-            onClick={() => setRoom("lobby")}
-            className="text-xs text-white/30 hover:text-[var(--doac-orange)] transition-colors ml-2 cursor-pointer"
-          >
-            Back to Lounge
-          </button>
+          {!showLive && (
+            <button
+              onClick={() => setRoom("lobby")}
+              className="text-xs text-white/30 hover:text-[var(--doac-orange)] transition-colors ml-2 cursor-pointer"
+            >
+              Back to Lounge
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-4 pointer-events-auto">
+          {showLive && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-xs text-red-300 font-medium">LIVE</span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <span className="text-xs text-white/60">
@@ -158,17 +242,54 @@ export default function WatchRoom() {
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-green-500" />
             <span className="text-xs text-white/60">{user?.name}</span>
+            {user?.seatNumber && (
+              <span className="text-xs text-[var(--doac-orange)]">#{user.seatNumber}</span>
+            )}
+            {isHost && (
+              <span className="px-2 py-0.5 rounded-full bg-[var(--doac-orange)]/20 text-[10px] text-[var(--doac-orange)] font-semibold uppercase">Host</span>
+            )}
           </div>
         </div>
       </header>
 
-      <CreatorFeeds onLeftFeed={setLeftSideVideo} onRightFeed={setRightSideVideo} />
+      {/* Host controls: Show toggle */}
+      {isHost && (
+        <div className="absolute top-14 right-4 z-30 pointer-events-auto">
+          {!showLive ? (
+            <button
+              onClick={() => toggleShow("start")}
+              className="px-4 py-2 rounded-xl bg-red-500/80 text-white text-sm font-medium hover:bg-red-500 transition-all cursor-pointer flex items-center gap-2"
+            >
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              Start Show
+            </button>
+          ) : (
+            <button
+              onClick={() => toggleShow("stop")}
+              className="px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-sm hover:bg-white/20 transition-all cursor-pointer"
+            >
+              End Show
+            </button>
+          )}
+        </div>
+      )}
 
-      <ScreenControls
-        onVideoElement={setVideoElement}
-        onYoutubeUrl={setYoutubeUrl}
-        isSeated={isSeated}
-      />
+      {/* Creator feeds — host only */}
+      {isHost && (
+        <CreatorFeeds onLeftFeed={setLeftSideVideo} onRightFeed={setRightSideVideo} />
+      )}
+
+      {/* Screen controls — host only */}
+      {isHost && (
+        <ScreenControls
+          onVideoElement={setVideoElement}
+          onYoutubeUrl={setYoutubeUrl}
+          isSeated={isSeated}
+        />
+      )}
+
+      {/* Stage audio — always visible, but capabilities differ by role */}
+      <StageAudio isHost={isHost} userName={user?.name || "Guest"} />
 
       <button
         onClick={() => setChatOpen((p) => !p)}

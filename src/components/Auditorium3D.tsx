@@ -24,9 +24,12 @@ interface AuditoriumProps {
   videoElement?: HTMLVideoElement | null;
   leftSideVideo?: HTMLVideoElement | null;
   rightSideVideo?: HTMLVideoElement | null;
+  assignedSeat?: number | null;
+  showLive?: boolean;
+  onLeaveSeat?: () => void;
 }
 
-export default function Auditorium3D({ onSit, videoElement, leftSideVideo, rightSideVideo }: AuditoriumProps) {
+export default function Auditorium3D({ onSit, videoElement, leftSideVideo, rightSideVideo, assignedSeat, showLive, onLeaveSeat }: AuditoriumProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [isSeated, setIsSeated] = useState(false);
   const [nearSeat, setNearSeat] = useState(false);
@@ -305,7 +308,34 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     let seated = false;
     let seatedIn: SeatData | null = null;
     let nearestSeat: SeatData | null = null;
+    let isShowLive = false;
     const clock = new THREE.Clock();
+
+    // ─── AUTO-SEAT (assigned seat) ───
+    function seatNumberToIndex(seatNum: number): number {
+      // Seat numbers are 1-based: seat 1 = row 0 col 0, seat 21 = row 1 col 0, etc.
+      return Math.max(0, Math.min(seatNum - 1, seats.length - 1));
+    }
+
+    function autoSeatPlayer(seatNum: number) {
+      const idx = seatNumberToIndex(seatNum);
+      const seat = seats[idx];
+      if (!seat) return;
+      seated = true;
+      seatedIn = seat;
+      seat.occupied = true;
+      avatar.visible = false;
+      isSeatedRef.current = true;
+      setIsSeated(true);
+      setNearSeat(false);
+      onSit?.(true);
+      document.exitPointerLock();
+    }
+
+    // Store reference for external control
+    const ext2 = mount as HTMLElement & { __autoSeat?: (n: number) => void; __setShowLive?: (v: boolean) => void };
+    ext2.__autoSeat = autoSeatPlayer;
+    ext2.__setShowLive = (v: boolean) => { isShowLive = v; };
 
     // ─── POINTER LOCK (click canvas to enable mouse look) ───
     function onCanvasClick() {
@@ -336,6 +366,17 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
 
       if (k === "f") {
         if (seated && seatedIn) {
+          if (isShowLive) {
+            // During live show, leaving seat sends you back to lounge
+            seated = false;
+            seatedIn.occupied = false;
+            seatedIn = null;
+            isSeatedRef.current = false;
+            setIsSeated(false);
+            onSit?.(false);
+            onLeaveSeat?.();
+            return;
+          }
           seated = false;
           seatedIn.occupied = false;
           avatar.visible = true;
@@ -344,7 +385,7 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
           isSeatedRef.current = false;
           setIsSeated(false);
           onSit?.(false);
-        } else if (nearestSeat && !nearestSeat.occupied) {
+        } else if (!isShowLive && nearestSeat && !nearestSeat.occupied) {
           seated = true;
           seatedIn = nearestSeat;
           nearestSeat.occupied = true;
@@ -374,7 +415,7 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
       const delta = clock.getDelta();
       const t = clock.getElapsedTime();
 
-      if (!seated) {
+      if (!seated && !isShowLive) {
         // ── WASD movement relative to camera yaw ──
         const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
         const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
@@ -548,7 +589,7 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
         )}
         {isSeated && (
           <div className="px-5 py-2.5 rounded-xl bg-black/70 backdrop-blur-md border border-white/20 text-white text-sm animate-fade-in">
-            Press <kbd className="px-2 py-0.5 mx-1 rounded bg-white/20 font-bold">F</kbd> to stand up
+            Press <kbd className="px-2 py-0.5 mx-1 rounded bg-white/20 font-bold">F</kbd> to {showLive ? "leave (returns to lounge)" : "stand up"}
           </div>
         )}
         {showControls && !isSeated && !nearSeat && (

@@ -14,7 +14,13 @@ export async function POST(request: NextRequest) {
   // Demo mode — accept any token
   if (!hasSupabase) {
     return NextResponse.json({
-      user: { id: "demo-user", name: "Demo Viewer", email: "demo@doac.com" },
+      user: {
+        id: "demo-user",
+        name: "Demo Viewer",
+        email: "demo@doac.com",
+        seatNumber: Math.floor(Math.random() * 300) + 1,
+        role: "host", // demo users get host access to test everything
+      },
     });
   }
 
@@ -23,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("registrations")
-    .select("id, name, email")
+    .select("id, name, email, seat_number, role")
     .eq("access_token", token)
     .single();
 
@@ -34,5 +40,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ user: data });
+  return NextResponse.json({
+    user: {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      seatNumber: data.seat_number,
+      role: data.role || "viewer",
+    },
+  });
 }
