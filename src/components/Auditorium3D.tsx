@@ -57,8 +57,8 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
 
     // ─── SCENE ───
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a1e);
-    scene.fog = new THREE.Fog(0x0a0a1e, 20, 60);
+    scene.background = new THREE.Color(0x050514);
+    scene.fog = new THREE.FogExp2(0x050514, 0.018);
 
     // ─── CAMERA ───
     const camera = new THREE.PerspectiveCamera(65, width / height, 0.1, 200);
@@ -66,32 +66,70 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     camera.position.set(0, 5, avatarStartZ + 6);
 
     // ─── MOUSE LOOK STATE ───
-    let yaw = 0; // horizontal rotation (radians)
+    let yaw = 0; // face toward -Z (toward the screen)
     let pitch = -0.15; // vertical rotation (slightly looking down)
     let isPointerLocked = false;
 
     // ─── LIGHTING ───
-    scene.add(new THREE.AmbientLight(0x2222aa, 1.5));
-    const hemi = new THREE.HemisphereLight(0x4444ff, 0x111133, 1.0);
+    scene.add(new THREE.AmbientLight(0x111133, 2.0));
+    const hemi = new THREE.HemisphereLight(0x2233aa, 0x0a0a20, 0.8);
     scene.add(hemi);
 
-    const stageLight = new THREE.SpotLight(0xe8734a, 60, 50, Math.PI / 3, 0.6, 1);
-    stageLight.position.set(0, 14, 2);
+    // Dramatic stage spotlights
+    const stageLight = new THREE.SpotLight(0xe8734a, 80, 50, Math.PI / 4, 0.7, 1);
+    stageLight.position.set(0, 18, 2);
     stageLight.target.position.set(0, 5, -10);
     stageLight.castShadow = true;
     scene.add(stageLight);
     scene.add(stageLight.target);
 
-    const purpleL = new THREE.PointLight(0x8844ff, 30, 35);
-    purpleL.position.set(-14, 5, 0);
+    const stageLight2 = new THREE.SpotLight(0xff5533, 40, 40, Math.PI / 5, 0.8, 1);
+    stageLight2.position.set(-8, 16, -2);
+    stageLight2.target.position.set(0, 3, -8);
+    scene.add(stageLight2);
+    scene.add(stageLight2.target);
+
+    const stageLight3 = new THREE.SpotLight(0xff5533, 40, 40, Math.PI / 5, 0.8, 1);
+    stageLight3.position.set(8, 16, -2);
+    stageLight3.target.position.set(0, 3, -8);
+    scene.add(stageLight3);
+    scene.add(stageLight3.target);
+
+    // Purple side wash
+    const purpleL = new THREE.PointLight(0x6633cc, 25, 35);
+    purpleL.position.set(-16, 5, 5);
     scene.add(purpleL);
-    const purpleR = new THREE.PointLight(0x8844ff, 30, 35);
-    purpleR.position.set(14, 5, 0);
+    const purpleR = new THREE.PointLight(0x6633cc, 25, 35);
+    purpleR.position.set(16, 5, 5);
     scene.add(purpleR);
 
-    const topFill = new THREE.PointLight(0x4466cc, 15, 50);
-    topFill.position.set(0, 15, 8);
+    // Blue top fill
+    const topFill = new THREE.PointLight(0x3355cc, 12, 50);
+    topFill.position.set(0, 18, 10);
     scene.add(topFill);
+
+    // Screen glow
+    const screenGlow = new THREE.PointLight(0x4466ff, 20, 20);
+    screenGlow.position.set(0, 6, -9);
+    scene.add(screenGlow);
+
+    // Aisle runner lights (orange dots along the aisle)
+    const aisleLights: THREE.PointLight[] = [];
+    for (let z = 2; z < avatarStartZ; z += 3) {
+      for (const x of [-1.2, 1.2]) {
+        const al = new THREE.PointLight(0xe8734a, 3, 4);
+        al.position.set(x, 0.1, z);
+        scene.add(al);
+        aisleLights.push(al);
+        // Tiny glowing dot
+        const dot = new THREE.Mesh(
+          new THREE.SphereGeometry(0.06, 6, 6),
+          new THREE.MeshBasicMaterial({ color: 0xe8734a })
+        );
+        dot.position.set(x, 0.08, z);
+        scene.add(dot);
+      }
+    }
 
     const pinkGlow = new THREE.PointLight(0xff44aa, 25, 20);
     pinkGlow.position.set(0, 6, -12);
@@ -100,12 +138,21 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     // ─── FLOOR ───
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(60, 60),
-      new THREE.MeshStandardMaterial({ color: 0x12123a, roughness: 0.3, metalness: 0.6 })
+      new THREE.MeshStandardMaterial({ color: 0x0a0a2a, roughness: 0.12, metalness: 0.85 })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.01;
     floor.receiveShadow = true;
     scene.add(floor);
+
+    // Carpet/aisle strip down the center
+    const aisleCarpet = new THREE.Mesh(
+      new THREE.PlaneGeometry(3, avatarStartZ + 2),
+      new THREE.MeshStandardMaterial({ color: 0x1a0a0a, roughness: 0.8, metalness: 0.1 })
+    );
+    aisleCarpet.rotation.x = -Math.PI / 2;
+    aisleCarpet.position.set(0, 0.005, avatarStartZ / 2);
+    scene.add(aisleCarpet);
 
     // ─── STAGE ───
     const stage = new THREE.Mesh(
@@ -447,20 +494,22 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
         avatar.position.y = groundY;
 
         // ── Camera: third-person with mouse look ──
+        // Forward direction matches movement: (-sin(yaw), 0, -cos(yaw))
+        // Camera sits behind avatar (opposite of forward)
         const camDist = 6;
         const camHeight = 3;
-        const camX = avatar.position.x - Math.sin(yaw) * -camDist;
-        const camZ = avatar.position.z - Math.cos(yaw) * -camDist;
-        const camY = avatar.position.y + camHeight - Math.sin(pitch) * camDist * 0.3;
+        const camX = avatar.position.x + Math.sin(yaw) * camDist;
+        const camZ = avatar.position.z + Math.cos(yaw) * camDist;
+        const camY = avatar.position.y + camHeight + Math.sin(pitch) * camDist * 0.3;
 
         const targetCamPos = new THREE.Vector3(camX, camY, camZ);
         camera.position.lerp(targetCamPos, 0.08);
 
-        // Look target: point in front of avatar based on yaw/pitch
+        // Look target: point in front of avatar (same direction as forward)
         const lookDist = 10;
-        const lookX = avatar.position.x + Math.sin(yaw) * lookDist;
-        const lookZ = avatar.position.z + Math.cos(yaw) * lookDist;
-        const lookY = avatar.position.y + 1.5 + Math.sin(pitch) * lookDist * 0.5;
+        const lookX = avatar.position.x - Math.sin(yaw) * lookDist;
+        const lookZ = avatar.position.z - Math.cos(yaw) * lookDist;
+        const lookY = avatar.position.y + 1.5 - Math.sin(pitch) * lookDist * 0.5;
         camera.lookAt(lookX, lookY, lookZ);
 
         // ── Nearest seat ──
@@ -501,6 +550,14 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
         decorBlocks[i].rotation.y += delta * 0.05;
       }
       pinkGlow.intensity = 20 + Math.sin(t * 1.5) * 8;
+
+      // Aisle lights wave effect
+      for (let i = 0; i < aisleLights.length; i++) {
+        aisleLights[i].intensity = 2 + Math.sin(t * 2 + i * 0.5) * 1.5;
+      }
+
+      // Screen glow breathing
+      screenGlow.intensity = 15 + Math.sin(t * 1.2) * 5;
 
       renderer.render(scene, camera);
     }
