@@ -1,3 +1,4 @@
+import Link from "next/link";
 import ThresholdCounter from "@/components/ThresholdCounter";
 import RegistrationForm from "@/components/RegistrationForm";
 
@@ -42,6 +43,16 @@ export default function HomePage() {
 
         {/* Registration form */}
         <RegistrationForm />
+
+        {/* Demo shortcut — skip straight to watch room */}
+        <div className="text-center mt-8 animate-fade-in-delay-2">
+          <Link
+            href="/watch/demo"
+            className="text-sm text-[var(--doac-text-muted)] hover:text-[var(--doac-orange)] transition-colors underline underline-offset-4"
+          >
+            Skip to watch room preview
+          </Link>
+        </div>
       </div>
     </main>
   );

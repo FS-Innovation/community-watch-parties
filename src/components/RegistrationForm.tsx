@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 const LIFE_STAGES = [
   "Student",
@@ -26,6 +27,7 @@ export default function RegistrationForm() {
     "idle" | "submitting" | "success" | "error"
   >("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [accessToken, setAccessToken] = useState("");
 
   function handleChange(
     e: React.ChangeEvent<
@@ -52,6 +54,8 @@ export default function RegistrationForm() {
         throw new Error(data.error || "Registration failed");
       }
 
+      const data = await res.json();
+      setAccessToken(data.token);
       setStatus("success");
     } catch (err) {
       setStatus("error");
@@ -66,10 +70,18 @@ export default function RegistrationForm() {
       <div className="glass-panel rounded-2xl p-8 text-center animate-fade-in max-w-lg mx-auto">
         <div className="text-4xl mb-4">🎬</div>
         <h2 className="text-2xl font-bold mb-2">You&apos;re in.</h2>
-        <p className="text-[var(--doac-text-muted)]">
+        <p className="text-[var(--doac-text-muted)] mb-6">
           Check your email for your unique access link. See you at the
           screening.
         </p>
+        {accessToken && (
+          <Link
+            href={`/watch/${accessToken}`}
+            className="inline-block px-6 py-3 rounded-lg bg-[var(--doac-orange)] text-white font-semibold hover:brightness-110 transition-all"
+          >
+            Enter the Watch Room
+          </Link>
+        )}
       </div>
     );
   }

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabase";
 import { v4 as uuidv4 } from "uuid";
+
+const hasSupabase =
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  process.env.NEXT_PUBLIC_SUPABASE_URL !== "your_supabase_url";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -21,6 +24,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const accessToken = uuidv4();
+
+  // If Supabase is not configured, return demo success
+  if (!hasSupabase) {
+    return NextResponse.json({ success: true, token: accessToken });
+  }
+
+  const { createServerSupabase } = await import("@/lib/supabase");
   const supabase = createServerSupabase();
 
   // Check if email already registered
@@ -48,8 +59,6 @@ export async function POST(request: NextRequest) {
       { status: 410 }
     );
   }
-
-  const accessToken = uuidv4();
 
   const { error: insertError } = await supabase
     .from("registrations")
@@ -93,7 +102,6 @@ export async function POST(request: NextRequest) {
         `,
       });
     } catch (emailError) {
-      // Log but don't fail registration if email fails
       console.error("Failed to send confirmation email:", emailError);
     }
   }

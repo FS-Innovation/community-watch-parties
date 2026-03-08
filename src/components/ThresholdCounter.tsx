@@ -1,38 +1,43 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 
 const TOTAL_SPOTS = 100;
+
+// Check if Supabase is configured
+const hasSupabase =
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  process.env.NEXT_PUBLIC_SUPABASE_URL !== "your_supabase_url";
 
 export default function ThresholdCounter() {
   const [claimed, setClaimed] = useState<number | null>(null);
 
   useEffect(() => {
-    async function fetchCount() {
-      const { count } = await supabase
-        .from("registrations")
-        .select("*", { count: "exact", head: true });
-      setClaimed(count ?? 0);
+    if (hasSupabase) {
+      // Real Supabase flow
+      import("@/lib/supabase").then(({ supabase }) => {
+        supabase
+          .from("registrations")
+          .select("*", { count: "exact", head: true })
+          .then(({ count }) => setClaimed(count ?? 0));
+
+        const channel = supabase
+          .channel("registrations-count")
+          .on(
+            "postgres_changes",
+            { event: "INSERT", schema: "public", table: "registrations" },
+            () => setClaimed((prev) => (prev !== null ? prev + 1 : 1))
+          )
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      });
+    } else {
+      // Demo mode — fake count with a slight delay for effect
+      setTimeout(() => setClaimed(73), 600);
     }
-
-    fetchCount();
-
-    // Subscribe to realtime inserts
-    const channel = supabase
-      .channel("registrations-count")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "registrations" },
-        () => {
-          setClaimed((prev) => (prev !== null ? prev + 1 : 1));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   if (claimed === null) return null;
@@ -42,6 +47,11 @@ export default function ThresholdCounter() {
 
   return (
     <div className="w-full max-w-md mx-auto animate-fade-in-delay">
+      {!hasSupabase && (
+        <p className="text-xs text-center text-yellow-500/70 mb-3">
+          Demo mode — no Supabase connected
+        </p>
+      )}
       <div className="flex justify-between items-baseline mb-2">
         <span className="text-sm font-medium tracking-wide uppercase text-[var(--doac-text-muted)]">
           {isFull ? "Event Full" : "Spots Claimed"}
