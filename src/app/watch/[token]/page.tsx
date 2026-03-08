@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -40,7 +40,7 @@ export default function WatchRoom() {
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
     null
   );
-  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [, setYoutubeUrl] = useState("");
   const [viewerCount] = useState(Math.floor(Math.random() * 80) + 24);
 
   useEffect(() => {
@@ -68,9 +68,9 @@ export default function WatchRoom() {
     verify();
   }, [token]);
 
-  const handleSit = useCallback((seated: boolean) => {
+  const handleSit = (seated: boolean) => {
     setIsSeated(seated);
-  }, []);
+  };
 
   if (status === "loading") {
     return (
@@ -112,7 +112,6 @@ export default function WatchRoom() {
         <Auditorium3D
           onSit={handleSit}
           videoElement={videoElement}
-          youtubeUrl={youtubeUrl}
         />
       </div>
 
