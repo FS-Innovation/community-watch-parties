@@ -21,9 +21,11 @@ interface SeatData {
 interface AuditoriumProps {
   onSit?: (seated: boolean) => void;
   videoElement?: HTMLVideoElement | null;
+  leftSideVideo?: HTMLVideoElement | null;
+  rightSideVideo?: HTMLVideoElement | null;
 }
 
-export default function Auditorium3D({ onSit, videoElement }: AuditoriumProps) {
+export default function Auditorium3D({ onSit, videoElement, leftSideVideo, rightSideVideo }: AuditoriumProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [isSeated, setIsSeated] = useState(false);
   const [nearSeat, setNearSeat] = useState(false);
@@ -141,20 +143,21 @@ export default function Auditorium3D({ onSit, videoElement }: AuditoriumProps) {
     // ─── MAIN SCREEN ───
     const screenW = 14;
     const screenH = 8;
-    const screenMat = new THREE.MeshBasicMaterial({ color: 0x111122 });
+    const screenMat = new THREE.MeshBasicMaterial({ color: 0x111122, side: THREE.FrontSide });
     const screenMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(screenW, screenH),
       screenMat
     );
-    screenMesh.position.set(0, 6.5, -10.8);
+    screenMesh.position.set(0, 6.5, -10.5);
+    screenMesh.renderOrder = 1;
     scene.add(screenMesh);
 
-    // Screen bezel / frame
+    // Screen bezel / frame — sits BEHIND the screen plane
     const bezel = new THREE.Mesh(
-      new THREE.BoxGeometry(screenW + 0.8, screenH + 0.8, 0.3),
+      new THREE.BoxGeometry(screenW + 0.8, screenH + 0.8, 0.4),
       new THREE.MeshStandardMaterial({ color: 0x222255, roughness: 0.3, metalness: 0.7 })
     );
-    bezel.position.set(0, 6.5, -10.95);
+    bezel.position.set(0, 6.5, -10.9);
     scene.add(bezel);
 
     // Glowing strip above screen
@@ -162,20 +165,43 @@ export default function Auditorium3D({ onSit, videoElement }: AuditoriumProps) {
       new THREE.BoxGeometry(screenW + 2, 0.1, 0.1),
       new THREE.MeshBasicMaterial({ color: 0x6644ff })
     );
-    topNeon.position.set(0, 10.95, -10.8);
+    topNeon.position.set(0, 10.95, -10.5);
     scene.add(topNeon);
 
     // ─── SIDE SCREENS ───
-    const sideScreenMat = new THREE.MeshBasicMaterial({ color: 0x1a1a44 });
-    const lScreen = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 3), sideScreenMat);
-    lScreen.position.set(-11, 6, -9.5);
-    lScreen.rotation.y = 0.35;
-    scene.add(lScreen);
+    const sideScreenMatL = new THREE.MeshBasicMaterial({ color: 0x1a1a44, side: THREE.FrontSide });
+    const leftSideScreen = new THREE.Mesh(new THREE.PlaneGeometry(5, 3.5), sideScreenMatL);
+    leftSideScreen.position.set(-11.5, 6, -9);
+    leftSideScreen.rotation.y = 0.35;
+    scene.add(leftSideScreen);
 
-    const rScreen = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 3), sideScreenMat.clone());
-    rScreen.position.set(11, 6, -9.5);
-    rScreen.rotation.y = -0.35;
-    scene.add(rScreen);
+    // Left side bezel
+    const lBezel = new THREE.Mesh(
+      new THREE.BoxGeometry(5.4, 3.9, 0.3),
+      new THREE.MeshStandardMaterial({ color: 0x222255, roughness: 0.3, metalness: 0.7 })
+    );
+    lBezel.position.set(-11.5, 6, -9);
+    lBezel.rotation.y = 0.35;
+    lBezel.position.z -= Math.cos(0.35) * 0.2;
+    lBezel.position.x += Math.sin(0.35) * 0.2;
+    scene.add(lBezel);
+
+    const sideScreenMatR = new THREE.MeshBasicMaterial({ color: 0x1a1a44, side: THREE.FrontSide });
+    const rightSideScreen = new THREE.Mesh(new THREE.PlaneGeometry(5, 3.5), sideScreenMatR);
+    rightSideScreen.position.set(11.5, 6, -9);
+    rightSideScreen.rotation.y = -0.35;
+    scene.add(rightSideScreen);
+
+    // Right side bezel
+    const rBezel = new THREE.Mesh(
+      new THREE.BoxGeometry(5.4, 3.9, 0.3),
+      new THREE.MeshStandardMaterial({ color: 0x222255, roughness: 0.3, metalness: 0.7 })
+    );
+    rBezel.position.set(11.5, 6, -9);
+    rBezel.rotation.y = -0.35;
+    rBezel.position.z -= Math.cos(0.35) * 0.2;
+    rBezel.position.x -= Math.sin(0.35) * 0.2;
+    scene.add(rBezel);
 
     // ─── WALLS ───
     const wallMat = new THREE.MeshStandardMaterial({
@@ -506,10 +532,15 @@ export default function Auditorium3D({ onSit, videoElement }: AuditoriumProps) {
     // Hide controls hint after 8s
     const controlsTimer = setTimeout(() => setShowControls(false), 8000);
 
-    // ─── VIDEO TEXTURE HANDLER ───
-    // We handle this via a MutationObserver-style check in the loop
-    // but for now we store a ref to screenMesh for external use
-    (mount as HTMLElement & { __screenMesh?: THREE.Mesh }).__screenMesh = screenMesh;
+    // Store screen meshes for external access (video textures)
+    const extMount = mount as HTMLElement & {
+      __screenMesh?: THREE.Mesh;
+      __leftSideScreen?: THREE.Mesh;
+      __rightSideScreen?: THREE.Mesh;
+    };
+    extMount.__screenMesh = screenMesh;
+    extMount.__leftSideScreen = leftSideScreen;
+    extMount.__rightSideScreen = rightSideScreen;
 
     // ─── CLEANUP ───
     return () => {
@@ -526,7 +557,7 @@ export default function Auditorium3D({ onSit, videoElement }: AuditoriumProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── VIDEO TEXTURE ───
+  // ─── VIDEO TEXTURE (screen share → main screen) ───
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount || !videoElement) return;
@@ -534,16 +565,69 @@ export default function Auditorium3D({ onSit, videoElement }: AuditoriumProps) {
     if (!screenMesh) return;
 
     const tex = new THREE.VideoTexture(videoElement);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
     tex.colorSpace = THREE.SRGBColorSpace;
-    (screenMesh.material as THREE.MeshBasicMaterial).map = tex;
-    (screenMesh.material as THREE.MeshBasicMaterial).needsUpdate = true;
+    const mat = screenMesh.material as THREE.MeshBasicMaterial;
+    mat.map = tex;
+    mat.color.setHex(0xffffff); // White so texture shows at full brightness
+    mat.needsUpdate = true;
 
     return () => {
       tex.dispose();
-      (screenMesh.material as THREE.MeshBasicMaterial).map = null;
-      (screenMesh.material as THREE.MeshBasicMaterial).needsUpdate = true;
+      mat.map = null;
+      mat.color.setHex(0x111122);
+      mat.needsUpdate = true;
     };
   }, [videoElement]);
+
+  // ─── VIDEO TEXTURE (creator cam → left side screen) ───
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount || !leftSideVideo) return;
+    const mesh = (mount as HTMLElement & { __leftSideScreen?: THREE.Mesh }).__leftSideScreen;
+    if (!mesh) return;
+
+    const tex = new THREE.VideoTexture(leftSideVideo);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = mesh.material as THREE.MeshBasicMaterial;
+    mat.map = tex;
+    mat.color.setHex(0xffffff);
+    mat.needsUpdate = true;
+
+    return () => {
+      tex.dispose();
+      mat.map = null;
+      mat.color.setHex(0x1a1a44);
+      mat.needsUpdate = true;
+    };
+  }, [leftSideVideo]);
+
+  // ─── VIDEO TEXTURE (creator cam → right side screen) ───
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount || !rightSideVideo) return;
+    const mesh = (mount as HTMLElement & { __rightSideScreen?: THREE.Mesh }).__rightSideScreen;
+    if (!mesh) return;
+
+    const tex = new THREE.VideoTexture(rightSideVideo);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = mesh.material as THREE.MeshBasicMaterial;
+    mat.map = tex;
+    mat.color.setHex(0xffffff);
+    mat.needsUpdate = true;
+
+    return () => {
+      tex.dispose();
+      mat.map = null;
+      mat.color.setHex(0x1a1a44);
+      mat.needsUpdate = true;
+    };
+  }, [rightSideVideo]);
 
   return (
     <div ref={mountRef} className="w-full h-full relative" style={{ minHeight: "100vh" }}>

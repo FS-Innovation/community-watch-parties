@@ -66,6 +66,8 @@ export default function ScreenControls({
       onVideoElement(video);
       setIsSharing(true);
       setMode("screenshare");
+      // Clear any YouTube
+      setActiveYoutubeId("");
 
       stream.getVideoTracks()[0].addEventListener("ended", () => {
         stopScreenShare();
@@ -173,15 +175,27 @@ export default function ScreenControls({
         </div>
       )}
 
-      {/* YouTube iframe overlay positioned over the 3D screen */}
-      {mode === "youtube" && activeYoutubeId && isSeated && (
-        <div className="absolute top-[15%] left-1/2 -translate-x-1/2 z-20 w-[60%] aspect-video pointer-events-auto">
+      {/*
+        YouTube iframe overlay — always visible when YouTube mode is active.
+        Positioned to visually overlap the 3D main screen area.
+        When seated, it's larger and centered for the viewing experience.
+        When standing, it's smaller but still visible so you can see it works.
+      */}
+      {mode === "youtube" && activeYoutubeId && (
+        <div
+          className={`absolute z-20 pointer-events-auto transition-all duration-500 ${
+            isSeated
+              ? "top-[8%] left-[20%] w-[60%]"
+              : "top-[5%] left-[25%] w-[50%]"
+          }`}
+          style={{ aspectRatio: "16/9" }}
+        >
           <iframe
             src={`https://www.youtube.com/embed/${activeYoutubeId}?autoplay=1&rel=0&modestbranding=1`}
             allow="autoplay; encrypted-media"
             allowFullScreen
-            className="w-full h-full rounded-lg"
-            style={{ border: "none" }}
+            className="w-full h-full rounded-lg shadow-2xl"
+            style={{ border: "2px solid rgba(100, 68, 255, 0.3)" }}
           />
         </div>
       )}

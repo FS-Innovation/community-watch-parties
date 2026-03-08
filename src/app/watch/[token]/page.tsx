@@ -6,6 +6,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import ChatPanel from "@/components/ChatPanel";
 import ScreenControls from "@/components/ScreenControls";
+import CreatorFeeds from "@/components/CreatorFeeds";
 
 // Dynamic import to avoid SSR issues with Three.js
 const Auditorium3D = dynamic(() => import("@/components/Auditorium3D"), {
@@ -37,10 +38,10 @@ export default function WatchRoom() {
   );
   const [isSeated, setIsSeated] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
-    null
-  );
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const [, setYoutubeUrl] = useState("");
+  const [leftSideVideo, setLeftSideVideo] = useState<HTMLVideoElement | null>(null);
+  const [rightSideVideo, setRightSideVideo] = useState<HTMLVideoElement | null>(null);
   const [viewerCount] = useState(Math.floor(Math.random() * 80) + 24);
 
   useEffect(() => {
@@ -67,10 +68,6 @@ export default function WatchRoom() {
 
     verify();
   }, [token]);
-
-  const handleSit = (seated: boolean) => {
-    setIsSeated(seated);
-  };
 
   if (status === "loading") {
     return (
@@ -107,11 +104,13 @@ export default function WatchRoom() {
 
   return (
     <main className="h-screen w-screen overflow-hidden bg-[#050510] relative">
-      {/* 3D Auditorium */}
+      {/* 3D Auditorium — full screen */}
       <div className="absolute inset-0 z-0">
         <Auditorium3D
-          onSit={handleSit}
+          onSit={setIsSeated}
           videoElement={videoElement}
+          leftSideVideo={leftSideVideo}
+          rightSideVideo={rightSideVideo}
         />
       </div>
 
@@ -138,7 +137,13 @@ export default function WatchRoom() {
         </div>
       </header>
 
-      {/* Screen controls (YouTube / Screen Share) */}
+      {/* Creator feeds (left side: Steven, right side: Guest) */}
+      <CreatorFeeds
+        onLeftFeed={setLeftSideVideo}
+        onRightFeed={setRightSideVideo}
+      />
+
+      {/* Screen controls (YouTube / Screen Share) — top right */}
       <ScreenControls
         onVideoElement={setVideoElement}
         onYoutubeUrl={setYoutubeUrl}
