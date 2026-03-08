@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 // ─── CONSTANTS ───
-const MOVE_SPEED = 0.12;
-const SEAT_ROWS = 5;
-const SEATS_PER_ROW = 8;
-const SEAT_SPACING_X = 2.4;
-const SEAT_SPACING_Z = 2.8;
+const MOVE_SPEED = 0.07;
+const MOUSE_SENSITIVITY = 0.002;
+const SEAT_ROWS = 15;
+const SEATS_PER_ROW = 20;
+const SEAT_SPACING_X = 2.0;
+const SEAT_SPACING_Z = 2.4;
 const SEAT_START_Z = 4;
-const ROW_ELEVATION = 0.6;
+const ROW_ELEVATION = 0.45;
 
 interface SeatData {
   group: THREE.Group;
@@ -31,7 +32,6 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
   const [nearSeat, setNearSeat] = useState(false);
   const [showControls, setShowControls] = useState(true);
 
-  // Keep mutable refs for things the effect closure needs to communicate to React
   const isSeatedRef = useRef(false);
   const nearSeatRef = useRef(false);
 
@@ -39,10 +39,10 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     const mount = mountRef.current;
     if (!mount) return;
 
-    // ─── RENDERER ───
     const width = mount.clientWidth || window.innerWidth;
     const height = mount.clientHeight || window.innerHeight;
 
+    // ─── RENDERER ───
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -62,15 +62,16 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     const avatarStartZ = SEAT_START_Z + SEAT_ROWS * SEAT_SPACING_Z + 4;
     camera.position.set(0, 5, avatarStartZ + 6);
 
-    // ─── LIGHTING ───
-    // Ambient — gives base visibility to everything
-    scene.add(new THREE.AmbientLight(0x2222aa, 1.5));
+    // ─── MOUSE LOOK STATE ───
+    let yaw = 0; // horizontal rotation (radians)
+    let pitch = -0.15; // vertical rotation (slightly looking down)
+    let isPointerLocked = false;
 
-    // Hemisphere — sky/ground colour split like Spatial
+    // ─── LIGHTING ───
+    scene.add(new THREE.AmbientLight(0x2222aa, 1.5));
     const hemi = new THREE.HemisphereLight(0x4444ff, 0x111133, 1.0);
     scene.add(hemi);
 
-    // Stage front light — orange wash on the screen area
     const stageLight = new THREE.SpotLight(0xe8734a, 60, 50, Math.PI / 3, 0.6, 1);
     stageLight.position.set(0, 14, 2);
     stageLight.target.position.set(0, 5, -10);
@@ -78,50 +79,42 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     scene.add(stageLight);
     scene.add(stageLight.target);
 
-    // Purple accent lights (left & right walls, like Spatial)
     const purpleL = new THREE.PointLight(0x8844ff, 30, 35);
     purpleL.position.set(-14, 5, 0);
     scene.add(purpleL);
-
     const purpleR = new THREE.PointLight(0x8844ff, 30, 35);
     purpleR.position.set(14, 5, 0);
     scene.add(purpleR);
 
-    // Blue top fill
     const topFill = new THREE.PointLight(0x4466cc, 15, 50);
     topFill.position.set(0, 15, 8);
     scene.add(topFill);
 
-    // Pink accent behind screen
     const pinkGlow = new THREE.PointLight(0xff44aa, 25, 20);
     pinkGlow.position.set(0, 6, -12);
     scene.add(pinkGlow);
 
     // ─── FLOOR ───
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x12123a,
-      roughness: 0.3,
-      metalness: 0.6,
-    });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), floorMat);
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(60, 60),
+      new THREE.MeshStandardMaterial({ color: 0x12123a, roughness: 0.3, metalness: 0.6 })
+    );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.01;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // ─── STAGE PLATFORM ───
-    const stageMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1a50,
-      roughness: 0.4,
-      metalness: 0.5,
-    });
-    const stage = new THREE.Mesh(new THREE.BoxGeometry(20, 1.5, 8), stageMat);
+    // ─── STAGE ───
+    const stage = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 1.5, 8),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a50, roughness: 0.4, metalness: 0.5 })
+    );
     stage.position.set(0, 0.75, -7);
     stage.receiveShadow = true;
     stage.castShadow = true;
     scene.add(stage);
 
-    // Stage front edge glow (neon strip)
+    // Stage neon edge
     const neonStrip = new THREE.Mesh(
       new THREE.BoxGeometry(20, 0.08, 0.08),
       new THREE.MeshBasicMaterial({ color: 0xe8734a })
@@ -141,18 +134,13 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     }
 
     // ─── MAIN SCREEN ───
-    const screenW = 14;
-    const screenH = 8;
+    const screenW = 14, screenH = 8;
     const screenMat = new THREE.MeshBasicMaterial({ color: 0x111122, side: THREE.FrontSide });
-    const screenMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(screenW, screenH),
-      screenMat
-    );
+    const screenMesh = new THREE.Mesh(new THREE.PlaneGeometry(screenW, screenH), screenMat);
     screenMesh.position.set(0, 6.5, -10.5);
     screenMesh.renderOrder = 1;
     scene.add(screenMesh);
 
-    // Screen bezel / frame — sits BEHIND the screen plane
     const bezel = new THREE.Mesh(
       new THREE.BoxGeometry(screenW + 0.8, screenH + 0.8, 0.4),
       new THREE.MeshStandardMaterial({ color: 0x222255, roughness: 0.3, metalness: 0.7 })
@@ -160,13 +148,10 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     bezel.position.set(0, 6.5, -10.9);
     scene.add(bezel);
 
-    // Glowing strip above screen
-    const topNeon = new THREE.Mesh(
+    scene.add(new THREE.Mesh(
       new THREE.BoxGeometry(screenW + 2, 0.1, 0.1),
       new THREE.MeshBasicMaterial({ color: 0x6644ff })
-    );
-    topNeon.position.set(0, 10.95, -10.5);
-    scene.add(topNeon);
+    )).position.set(0, 10.95, -10.5);
 
     // ─── SIDE SCREENS ───
     const sideScreenMatL = new THREE.MeshBasicMaterial({ color: 0x1a1a44, side: THREE.FrontSide });
@@ -175,7 +160,6 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     leftSideScreen.rotation.y = 0.35;
     scene.add(leftSideScreen);
 
-    // Left side bezel
     const lBezel = new THREE.Mesh(
       new THREE.BoxGeometry(5.4, 3.9, 0.3),
       new THREE.MeshStandardMaterial({ color: 0x222255, roughness: 0.3, metalness: 0.7 })
@@ -192,7 +176,6 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     rightSideScreen.rotation.y = -0.35;
     scene.add(rightSideScreen);
 
-    // Right side bezel
     const rBezel = new THREE.Mesh(
       new THREE.BoxGeometry(5.4, 3.9, 0.3),
       new THREE.MeshStandardMaterial({ color: 0x222255, roughness: 0.3, metalness: 0.7 })
@@ -204,81 +187,58 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     scene.add(rBezel);
 
     // ─── WALLS ───
-    const wallMat = new THREE.MeshStandardMaterial({
-      color: 0x0e0e30,
-      roughness: 0.7,
-      metalness: 0.3,
-    });
-
-    // Back wall (behind screen)
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(40, 18, 0.5), wallMat);
-    backWall.position.set(0, 9, -11.5);
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x0e0e30, roughness: 0.7, metalness: 0.3 });
+    const roomWidth = 55;
+    const roomDepth = 60;
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 20, 0.5), wallMat);
+    backWall.position.set(0, 10, -11.5);
     scene.add(backWall);
 
-    // Side walls
     for (const side of [-1, 1]) {
-      const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 18, 45), wallMat);
-      sideWall.position.set(side * 17, 9, 3);
-      scene.add(sideWall);
+      const sw = new THREE.Mesh(new THREE.BoxGeometry(0.5, 20, roomDepth), wallMat);
+      sw.position.set(side * (roomWidth / 2), 10, 10);
+      scene.add(sw);
     }
 
-    // Ceiling
     const ceiling = new THREE.Mesh(
-      new THREE.PlaneGeometry(40, 45),
+      new THREE.PlaneGeometry(roomWidth, roomDepth),
       new THREE.MeshStandardMaterial({ color: 0x080820, roughness: 0.9 })
     );
     ceiling.rotation.x = Math.PI / 2;
-    ceiling.position.set(0, 17, 3);
+    ceiling.position.set(0, 20, 10);
     scene.add(ceiling);
 
-    // ─── DECORATIVE WALL BLOCKS (Spatial-style) ───
+    // ─── DECORATIVE BLOCKS ───
     const blockMat1 = new THREE.MeshStandardMaterial({ color: 0x202066, roughness: 0.4, metalness: 0.5 });
     const blockMat2 = new THREE.MeshStandardMaterial({ color: 0x3030aa, roughness: 0.4, metalness: 0.5 });
-
     const decorBlocks: THREE.Mesh[] = [];
+
     for (let i = 0; i < 50; i++) {
       const s = 0.4 + Math.random() * 1.8;
-      const mat = Math.random() > 0.5 ? blockMat1 : blockMat2;
-      const block = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), mat);
+      const block = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), Math.random() > 0.5 ? blockMat1 : blockMat2);
       const side = Math.random() > 0.5 ? 1 : -1;
-      block.position.set(
-        side * (13 + Math.random() * 4),
-        0.5 + Math.random() * 14,
-        -10 + Math.random() * 30
-      );
+      block.position.set(side * (22 + Math.random() * 5), 0.5 + Math.random() * 16, -10 + Math.random() * 50);
       block.rotation.set(Math.random() * 0.4, Math.random() * Math.PI, Math.random() * 0.4);
       block.castShadow = true;
       scene.add(block);
       decorBlocks.push(block);
     }
-
-    // Blocks behind screen too
     for (let i = 0; i < 15; i++) {
       const s = 0.5 + Math.random() * 2;
-      const block = new THREE.Mesh(
-        new THREE.BoxGeometry(s, s, s),
-        Math.random() > 0.5 ? blockMat1 : blockMat2
-      );
-      block.position.set(
-        -8 + Math.random() * 16,
-        8 + Math.random() * 8,
-        -11 + Math.random() * -3
-      );
+      const block = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), Math.random() > 0.5 ? blockMat1 : blockMat2);
+      block.position.set(-8 + Math.random() * 16, 8 + Math.random() * 8, -11 + Math.random() * -3);
       block.rotation.set(Math.random(), Math.random(), Math.random());
       scene.add(block);
       decorBlocks.push(block);
     }
 
-    // ─── TIERED SEATING PLATFORMS ───
+    // ─── TIERED SEATING ───
     for (let r = 0; r < SEAT_ROWS; r++) {
-      const tierW = SEATS_PER_ROW * SEAT_SPACING_X + 6;
-      const tierH = (r + 1) * ROW_ELEVATION;
-      const tierD = SEAT_SPACING_Z * 0.85;
       const tier = new THREE.Mesh(
-        new THREE.BoxGeometry(tierW, tierH, tierD),
+        new THREE.BoxGeometry(SEATS_PER_ROW * SEAT_SPACING_X + 6, (r + 1) * ROW_ELEVATION, SEAT_SPACING_Z * 0.85),
         new THREE.MeshStandardMaterial({ color: 0x151550, roughness: 0.5, metalness: 0.4 })
       );
-      tier.position.set(0, tierH / 2, SEAT_START_Z + r * SEAT_SPACING_Z);
+      tier.position.set(0, ((r + 1) * ROW_ELEVATION) / 2, SEAT_START_Z + r * SEAT_SPACING_Z);
       tier.receiveShadow = true;
       scene.add(tier);
     }
@@ -291,66 +251,45 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     for (let row = 0; row < SEAT_ROWS; row++) {
       const y = (row + 1) * ROW_ELEVATION;
       const z = SEAT_START_Z + row * SEAT_SPACING_Z;
-
       for (let col = 0; col < SEATS_PER_ROW; col++) {
         const x = (col - (SEATS_PER_ROW - 1) / 2) * SEAT_SPACING_X;
         const group = new THREE.Group();
 
-        // Seat cushion
-        const cushion = new THREE.Mesh(
-          new THREE.BoxGeometry(1.4, 0.5, 1.1),
-          seatBaseMat.clone()
-        );
+        const cushion = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 1.1), seatBaseMat.clone());
         cushion.position.y = 0.25;
         cushion.castShadow = true;
         group.add(cushion);
 
-        // Seat back
-        const back = new THREE.Mesh(
-          new THREE.BoxGeometry(1.4, 1.4, 0.2),
-          seatBackMat.clone()
-        );
+        const back = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 0.2), seatBackMat.clone());
         back.position.set(0, 1.0, -0.45);
         group.add(back);
 
-        // Armrests
         const armGeo = new THREE.BoxGeometry(0.12, 0.55, 0.9);
         const armMat = new THREE.MeshStandardMaterial({ color: 0x444488, roughness: 0.3, metalness: 0.6 });
-        const lArm = new THREE.Mesh(armGeo, armMat);
-        lArm.position.set(-0.75, 0.5, -0.05);
-        group.add(lArm);
-        const rArm = new THREE.Mesh(armGeo, armMat);
-        rArm.position.set(0.75, 0.5, -0.05);
-        group.add(rArm);
+        const la = new THREE.Mesh(armGeo, armMat);
+        la.position.set(-0.75, 0.5, -0.05);
+        group.add(la);
+        const ra = new THREE.Mesh(armGeo, armMat);
+        ra.position.set(0.75, 0.5, -0.05);
+        group.add(ra);
 
         group.position.set(x, y, z);
         scene.add(group);
-
-        seats.push({
-          group,
-          worldPos: new THREE.Vector3(x, y, z),
-          occupied: false,
-        });
+        seats.push({ group, worldPos: new THREE.Vector3(x, y, z), occupied: false });
       }
     }
 
     // ─── AVATAR ───
     const avatar = new THREE.Group();
     const avatarBodyMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.3, metalness: 0.1 });
-
-    // Body capsule
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.9, 8, 16), avatarBodyMat);
     body.position.y = 1.1;
     body.castShadow = true;
     avatar.add(body);
-
-    // Head
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), avatarBodyMat);
     head.position.y = 1.9;
     head.castShadow = true;
     avatar.add(head);
-
-    // Ground glow ring
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.45, 0.55, 32),
       new THREE.MeshBasicMaterial({ color: 0xe8734a, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
@@ -358,28 +297,45 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.02;
     avatar.add(ring);
-
     avatar.position.set(0, 0, avatarStartZ);
     scene.add(avatar);
 
-    // ─── MUTABLE STATE ───
+    // ─── STATE ───
     const keys: Record<string, boolean> = {};
     let seated = false;
     let seatedIn: SeatData | null = null;
     let nearestSeat: SeatData | null = null;
     const clock = new THREE.Clock();
 
-    // ─── INPUT ───
-    function onKeyDown(e: KeyboardEvent) {
-      // Don't capture if user is typing in an input
-      if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
+    // ─── POINTER LOCK (click canvas to enable mouse look) ───
+    function onCanvasClick() {
+      if (!seated) {
+        renderer.domElement.requestPointerLock();
+      }
+    }
+    renderer.domElement.addEventListener("click", onCanvasClick);
 
+    function onPointerLockChange() {
+      isPointerLocked = document.pointerLockElement === renderer.domElement;
+    }
+    document.addEventListener("pointerlockchange", onPointerLockChange);
+
+    function onMouseMove(e: MouseEvent) {
+      if (!isPointerLocked || seated) return;
+      yaw -= e.movementX * MOUSE_SENSITIVITY;
+      pitch -= e.movementY * MOUSE_SENSITIVITY;
+      pitch = THREE.MathUtils.clamp(pitch, -Math.PI / 3, Math.PI / 3);
+    }
+    document.addEventListener("mousemove", onMouseMove);
+
+    // ─── KEYBOARD ───
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
       const k = e.key.toLowerCase();
       keys[k] = true;
 
       if (k === "f") {
         if (seated && seatedIn) {
-          // Stand up
           seated = false;
           seatedIn.occupied = false;
           avatar.visible = true;
@@ -389,7 +345,6 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
           setIsSeated(false);
           onSit?.(false);
         } else if (nearestSeat && !nearestSeat.occupied) {
-          // Sit
           seated = true;
           seatedIn = nearestSeat;
           nearestSeat.occupied = true;
@@ -398,46 +353,48 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
           setIsSeated(true);
           setNearSeat(false);
           onSit?.(true);
+          // Exit pointer lock when sitting
+          document.exitPointerLock();
         }
       }
-    }
 
-    function onKeyUp(e: KeyboardEvent) {
-      keys[e.key.toLowerCase()] = false;
+      if (k === "escape") {
+        document.exitPointerLock();
+      }
     }
-
+    function onKeyUp(e: KeyboardEvent) { keys[e.key.toLowerCase()] = false; }
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
-    // ─── ANIMATION LOOP ───
+    // ─── ANIMATION ───
     let rafId: number;
 
     function animate() {
       rafId = requestAnimationFrame(animate);
-
       const delta = clock.getDelta();
       const t = clock.getElapsedTime();
 
-      // ── Avatar movement ──
       if (!seated) {
+        // ── WASD movement relative to camera yaw ──
+        const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+        const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
         const dir = new THREE.Vector3();
-        // Camera looks toward -Z (toward screen), so forward = -Z
-        if (keys["w"] || keys["arrowup"]) dir.z -= 1;
-        if (keys["s"] || keys["arrowdown"]) dir.z += 1;
-        if (keys["a"] || keys["arrowleft"]) dir.x -= 1;
-        if (keys["d"] || keys["arrowright"]) dir.x += 1;
+
+        if (keys["w"] || keys["arrowup"]) dir.add(forward);
+        if (keys["s"] || keys["arrowdown"]) dir.add(forward.clone().negate());
+        if (keys["a"] || keys["arrowleft"]) dir.add(right.clone().negate());
+        if (keys["d"] || keys["arrowright"]) dir.add(right);
 
         if (dir.lengthSq() > 0) {
           dir.normalize().multiplyScalar(MOVE_SPEED);
           avatar.position.add(dir);
-          avatar.position.x = THREE.MathUtils.clamp(avatar.position.x, -15, 15);
-          avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -2, avatarStartZ + 2);
-
-          // Face direction
+          avatar.position.x = THREE.MathUtils.clamp(avatar.position.x, -25, 25);
+          avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -2, avatarStartZ + 4);
+          // Face movement direction
           avatar.rotation.y = Math.atan2(dir.x, dir.z);
         }
 
-        // Ground height — match tier elevation
+        // Ground height
         let groundY = 0;
         for (let r = SEAT_ROWS - 1; r >= 0; r--) {
           const rowZ = SEAT_START_Z + r * SEAT_SPACING_Z;
@@ -448,35 +405,35 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
         }
         avatar.position.y = groundY;
 
-        // Camera follow (third-person, behind + above)
-        const camTarget = new THREE.Vector3(
-          avatar.position.x * 0.5,
-          avatar.position.y + 5,
-          avatar.position.z + 8
-        );
-        camera.position.lerp(camTarget, 0.04);
-        const lookAt = new THREE.Vector3(avatar.position.x * 0.3, avatar.position.y + 3, avatar.position.z - 6);
-        camera.lookAt(lookAt);
+        // ── Camera: third-person with mouse look ──
+        const camDist = 6;
+        const camHeight = 3;
+        const camX = avatar.position.x - Math.sin(yaw) * -camDist;
+        const camZ = avatar.position.z - Math.cos(yaw) * -camDist;
+        const camY = avatar.position.y + camHeight - Math.sin(pitch) * camDist * 0.3;
 
-        // Nearest seat detection
+        const targetCamPos = new THREE.Vector3(camX, camY, camZ);
+        camera.position.lerp(targetCamPos, 0.08);
+
+        // Look target: point in front of avatar based on yaw/pitch
+        const lookDist = 10;
+        const lookX = avatar.position.x + Math.sin(yaw) * lookDist;
+        const lookZ = avatar.position.z + Math.cos(yaw) * lookDist;
+        const lookY = avatar.position.y + 1.5 + Math.sin(pitch) * lookDist * 0.5;
+        camera.lookAt(lookX, lookY, lookZ);
+
+        // ── Nearest seat ──
         let closest: SeatData | null = null;
         let closestDist = 3.0;
         for (const seat of seats) {
           const d = avatar.position.distanceTo(seat.worldPos);
-          if (d < closestDist && !seat.occupied) {
-            closestDist = d;
-            closest = seat;
-          }
+          if (d < closestDist && !seat.occupied) { closestDist = d; closest = seat; }
         }
         nearestSeat = closest;
-
         const isNear = !!closest;
-        if (isNear !== nearSeatRef.current) {
-          nearSeatRef.current = isNear;
-          setNearSeat(isNear);
-        }
+        if (isNear !== nearSeatRef.current) { nearSeatRef.current = isNear; setNearSeat(isNear); }
 
-        // Highlight seats
+        // Highlight
         for (const seat of seats) {
           const cushion = seat.group.children[0] as THREE.Mesh;
           const mat = cushion.material as THREE.MeshStandardMaterial;
@@ -489,33 +446,23 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
           }
         }
 
-        // Subtle body bob
         body.position.y = 1.1 + Math.sin(t * 2.5) * 0.03;
-
       } else if (seatedIn) {
-        // Seated view — look at screen
-        const camTarget = new THREE.Vector3(
-          seatedIn.worldPos.x * 0.4,
-          seatedIn.worldPos.y + 3,
-          seatedIn.worldPos.z + 2
-        );
+        // Seated: smooth camera to screen view
+        const camTarget = new THREE.Vector3(seatedIn.worldPos.x * 0.4, seatedIn.worldPos.y + 3, seatedIn.worldPos.z + 2);
         camera.position.lerp(camTarget, 0.04);
         camera.lookAt(0, 6.5, -10.8);
       }
 
-      // Floating blocks subtle animation
+      // Floating blocks
       for (let i = 0; i < decorBlocks.length; i++) {
-        const b = decorBlocks[i];
-        b.position.y += Math.sin(t * 0.4 + i * 0.7) * 0.002;
-        b.rotation.y += delta * 0.05;
+        decorBlocks[i].position.y += Math.sin(t * 0.4 + i * 0.7) * 0.002;
+        decorBlocks[i].rotation.y += delta * 0.05;
       }
-
-      // Screen glow pulse
       pinkGlow.intensity = 20 + Math.sin(t * 1.5) * 8;
 
       renderer.render(scene, camera);
     }
-
     rafId = requestAnimationFrame(animate);
 
     // ─── RESIZE ───
@@ -529,109 +476,70 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     }
     window.addEventListener("resize", onResize);
 
-    // Hide controls hint after 8s
     const controlsTimer = setTimeout(() => setShowControls(false), 8000);
 
-    // Store screen meshes for external access (video textures)
-    const extMount = mount as HTMLElement & {
-      __screenMesh?: THREE.Mesh;
-      __leftSideScreen?: THREE.Mesh;
-      __rightSideScreen?: THREE.Mesh;
-    };
-    extMount.__screenMesh = screenMesh;
-    extMount.__leftSideScreen = leftSideScreen;
-    extMount.__rightSideScreen = rightSideScreen;
+    // Store meshes for video textures
+    const ext = mount as HTMLElement & { __screenMesh?: THREE.Mesh; __leftSideScreen?: THREE.Mesh; __rightSideScreen?: THREE.Mesh };
+    ext.__screenMesh = screenMesh;
+    ext.__leftSideScreen = leftSideScreen;
+    ext.__rightSideScreen = rightSideScreen;
 
-    // ─── CLEANUP ───
     return () => {
       cancelAnimationFrame(rafId);
+      renderer.domElement.removeEventListener("click", onCanvasClick);
+      document.removeEventListener("pointerlockchange", onPointerLockChange);
+      document.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("resize", onResize);
       clearTimeout(controlsTimer);
       renderer.dispose();
-      if (mount.contains(renderer.domElement)) {
-        mount.removeChild(renderer.domElement);
-      }
+      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── VIDEO TEXTURE (screen share → main screen) ───
+  // ─── VIDEO TEXTURES ───
   useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount || !videoElement) return;
-    const screenMesh = (mount as HTMLElement & { __screenMesh?: THREE.Mesh }).__screenMesh;
-    if (!screenMesh) return;
-
+    const m = mountRef.current;
+    if (!m || !videoElement) return;
+    const mesh = (m as HTMLElement & { __screenMesh?: THREE.Mesh }).__screenMesh;
+    if (!mesh) return;
     const tex = new THREE.VideoTexture(videoElement);
     tex.minFilter = THREE.LinearFilter;
     tex.magFilter = THREE.LinearFilter;
     tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = screenMesh.material as THREE.MeshBasicMaterial;
-    mat.map = tex;
-    mat.color.setHex(0xffffff); // White so texture shows at full brightness
-    mat.needsUpdate = true;
-
-    return () => {
-      tex.dispose();
-      mat.map = null;
-      mat.color.setHex(0x111122);
-      mat.needsUpdate = true;
-    };
+    const mat = mesh.material as THREE.MeshBasicMaterial;
+    mat.map = tex; mat.color.setHex(0xffffff); mat.needsUpdate = true;
+    return () => { tex.dispose(); mat.map = null; mat.color.setHex(0x111122); mat.needsUpdate = true; };
   }, [videoElement]);
 
-  // ─── VIDEO TEXTURE (creator cam → left side screen) ───
   useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount || !leftSideVideo) return;
-    const mesh = (mount as HTMLElement & { __leftSideScreen?: THREE.Mesh }).__leftSideScreen;
+    const m = mountRef.current;
+    if (!m || !leftSideVideo) return;
+    const mesh = (m as HTMLElement & { __leftSideScreen?: THREE.Mesh }).__leftSideScreen;
     if (!mesh) return;
-
     const tex = new THREE.VideoTexture(leftSideVideo);
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.colorSpace = THREE.SRGBColorSpace;
     const mat = mesh.material as THREE.MeshBasicMaterial;
-    mat.map = tex;
-    mat.color.setHex(0xffffff);
-    mat.needsUpdate = true;
-
-    return () => {
-      tex.dispose();
-      mat.map = null;
-      mat.color.setHex(0x1a1a44);
-      mat.needsUpdate = true;
-    };
+    mat.map = tex; mat.color.setHex(0xffffff); mat.needsUpdate = true;
+    return () => { tex.dispose(); mat.map = null; mat.color.setHex(0x1a1a44); mat.needsUpdate = true; };
   }, [leftSideVideo]);
 
-  // ─── VIDEO TEXTURE (creator cam → right side screen) ───
   useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount || !rightSideVideo) return;
-    const mesh = (mount as HTMLElement & { __rightSideScreen?: THREE.Mesh }).__rightSideScreen;
+    const m = mountRef.current;
+    if (!m || !rightSideVideo) return;
+    const mesh = (m as HTMLElement & { __rightSideScreen?: THREE.Mesh }).__rightSideScreen;
     if (!mesh) return;
-
     const tex = new THREE.VideoTexture(rightSideVideo);
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.colorSpace = THREE.SRGBColorSpace;
     const mat = mesh.material as THREE.MeshBasicMaterial;
-    mat.map = tex;
-    mat.color.setHex(0xffffff);
-    mat.needsUpdate = true;
-
-    return () => {
-      tex.dispose();
-      mat.map = null;
-      mat.color.setHex(0x1a1a44);
-      mat.needsUpdate = true;
-    };
+    mat.map = tex; mat.color.setHex(0xffffff); mat.needsUpdate = true;
+    return () => { tex.dispose(); mat.map = null; mat.color.setHex(0x1a1a44); mat.needsUpdate = true; };
   }, [rightSideVideo]);
 
   return (
     <div ref={mountRef} className="w-full h-full relative" style={{ minHeight: "100vh" }}>
-      {/* HUD prompts */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 pointer-events-none z-10">
         {nearSeat && !isSeated && (
           <div className="px-5 py-2.5 rounded-xl bg-black/70 backdrop-blur-md border border-[#e8734a]/50 text-white text-sm font-medium animate-fade-in">
@@ -645,14 +553,16 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
         )}
         {showControls && !isSeated && !nearSeat && (
           <div className="px-5 py-2.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white/70 text-sm animate-fade-in">
+            Click to look around
+            <span className="mx-2 text-white/30">|</span>
             <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-bold mr-1">W</kbd>
             <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-bold mr-1">A</kbd>
             <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-bold mr-1">S</kbd>
             <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-bold">D</kbd>
-            <span className="ml-2">to move</span>
+            <span className="ml-1">move</span>
             <span className="mx-2 text-white/30">|</span>
             <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-bold">F</kbd>
-            <span className="ml-1">to sit</span>
+            <span className="ml-1">sit</span>
           </div>
         )}
       </div>
