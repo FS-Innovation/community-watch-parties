@@ -58,16 +58,21 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
     // ─── SCENE ───
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x050514);
-    scene.fog = new THREE.FogExp2(0x050514, 0.018);
+    scene.fog = new THREE.FogExp2(0x050514, 0.008);
 
     // ─── CAMERA ───
     const camera = new THREE.PerspectiveCamera(65, width / height, 0.1, 200);
-    const avatarStartZ = SEAT_START_Z + SEAT_ROWS * SEAT_SPACING_Z + 4;
-    camera.position.set(0, 5, avatarStartZ + 6);
+    // Avatar spawns at back of seating area
+    const lastRowZ = SEAT_START_Z + (SEAT_ROWS - 1) * SEAT_SPACING_Z;
+    const avatarStartZ = lastRowZ + 4; // just behind the last row
+
+    // Start camera behind avatar, elevated, looking toward screen
+    camera.position.set(0, 8, avatarStartZ + 6);
+    camera.lookAt(0, 4, -10); // look toward the screen
 
     // ─── MOUSE LOOK STATE ───
     let yaw = 0; // face toward -Z (toward the screen)
-    let pitch = -0.15; // vertical rotation (slightly looking down)
+    let pitch = -0.1; // slightly looking down
     let isPointerLocked = false;
 
     // ─── LIGHTING ───
@@ -477,7 +482,7 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
           dir.normalize().multiplyScalar(MOVE_SPEED);
           avatar.position.add(dir);
           avatar.position.x = THREE.MathUtils.clamp(avatar.position.x, -25, 25);
-          avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -2, avatarStartZ + 4);
+          avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -2, avatarStartZ + 2);
           // Face movement direction
           avatar.rotation.y = Math.atan2(dir.x, dir.z);
         }
@@ -494,22 +499,21 @@ export default function Auditorium3D({ onSit, videoElement, leftSideVideo, right
         avatar.position.y = groundY;
 
         // ── Camera: third-person with mouse look ──
-        // Forward direction matches movement: (-sin(yaw), 0, -cos(yaw))
-        // Camera sits behind avatar (opposite of forward)
-        const camDist = 6;
-        const camHeight = 3;
+        // Camera behind avatar (opposite of forward direction)
+        const camDist = 5;
+        const camHeight = 4;
         const camX = avatar.position.x + Math.sin(yaw) * camDist;
         const camZ = avatar.position.z + Math.cos(yaw) * camDist;
-        const camY = avatar.position.y + camHeight + Math.sin(pitch) * camDist * 0.3;
+        const camY = Math.max(2, avatar.position.y + camHeight + Math.sin(pitch) * 2);
 
         const targetCamPos = new THREE.Vector3(camX, camY, camZ);
-        camera.position.lerp(targetCamPos, 0.08);
+        camera.position.lerp(targetCamPos, 0.1);
 
-        // Look target: point in front of avatar (same direction as forward)
-        const lookDist = 10;
+        // Look target: ahead of avatar in the direction they face
+        const lookDist = 12;
         const lookX = avatar.position.x - Math.sin(yaw) * lookDist;
         const lookZ = avatar.position.z - Math.cos(yaw) * lookDist;
-        const lookY = avatar.position.y + 1.5 - Math.sin(pitch) * lookDist * 0.5;
+        const lookY = avatar.position.y + 2 + Math.sin(pitch) * 5;
         camera.lookAt(lookX, lookY, lookZ);
 
         // ── Nearest seat ──
