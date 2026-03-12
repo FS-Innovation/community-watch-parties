@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
+import MuxPlayer from "@mux/mux-player-react";
+import type MuxPlayerElement from "@mux/mux-player";
 import type { SyncState } from "@/lib/types";
 
 interface Props {
@@ -10,13 +12,13 @@ interface Props {
 }
 
 export default function VideoPlayer({ playbackId, syncState, onTimeUpdate }: Props) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<MuxPlayerElement>(null);
   const lastSyncRef = useRef<number>(0);
 
   // Apply sync state from server
   const applySync = useCallback((sync: SyncState) => {
-    const video = videoRef.current;
-    if (!video || !video.duration) return;
+    const player = playerRef.current;
+    if (!player || !player.duration) return;
 
     // Calculate where the video should be right now
     const elapsed = (Date.now() - sync.updated_at) / 1000;
@@ -24,25 +26,25 @@ export default function VideoPlayer({ playbackId, syncState, onTimeUpdate }: Pro
       ? sync.timestamp + elapsed * sync.rate
       : sync.timestamp;
 
-    const drift = Math.abs(video.currentTime - targetTime);
+    const drift = Math.abs(player.currentTime - targetTime);
 
     if (drift > 3) {
       // Hard seek — drift too large
-      video.currentTime = targetTime;
+      player.currentTime = targetTime;
     } else if (drift > 0.5) {
       // Gentle rate adjustment to drift back
-      video.playbackRate = video.currentTime < targetTime ? 1.02 : 0.98;
+      player.playbackRate = player.currentTime < targetTime ? 1.02 : 0.98;
       // Reset rate after 2 seconds
       setTimeout(() => {
-        if (videoRef.current) videoRef.current.playbackRate = sync.rate;
+        if (playerRef.current) playerRef.current.playbackRate = sync.rate;
       }, 2000);
     }
 
     // Play/pause state
-    if (sync.state === "playing" && video.paused) {
-      video.play().catch(() => {});
-    } else if (sync.state === "paused" && !video.paused) {
-      video.pause();
+    if (sync.state === "playing" && player.paused) {
+      player.play().catch(() => {});
+    } else if (sync.state === "paused" && !player.paused) {
+      player.pause();
     }
   }, []);
 
@@ -55,13 +57,18 @@ export default function VideoPlayer({ playbackId, syncState, onTimeUpdate }: Pro
   }, [syncState, applySync]);
 
   // Report time updates
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !onTimeUpdate) return;
-    const handler = () => onTimeUpdate(video.currentTime);
-    video.addEventListener("timeupdate", handler);
-    return () => video.removeEventListener("timeupdate", handler);
+  const handleTimeUpdate = useCallback((e: Event) => {
+    if (!onTimeUpdate) return;
+    const target = e.target as HTMLMediaElement;
+    if (target) onTimeUpdate(target.currentTime);
   }, [onTimeUpdate]);
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || !onTimeUpdate) return;
+    player.addEventListener("timeupdate", handleTimeUpdate);
+    return () => player.removeEventListener("timeupdate", handleTimeUpdate);
+  }, [onTimeUpdate, handleTimeUpdate]);
 
   if (!playbackId) {
     return (
@@ -76,24 +83,25 @@ export default function VideoPlayer({ playbackId, syncState, onTimeUpdate }: Pro
 
   return (
     <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden">
-      {/*
-        In production, replace this with:
-        <MuxPlayer playbackId={playbackId} streamType="on-demand" />
-
-        For now, using a standard video element that would receive
-        the HLS stream URL from Mux: https://stream.mux.com/{playbackId}.m3u8
-      */}
-      <video
-        ref={videoRef}
-        className="w-full h-full object-contain bg-black"
-        playsInline
-        controls={false}
-      >
-        <source
-          src={`https://stream.mux.com/${playbackId}.m3u8`}
-          type="application/x-mpegURL"
-        />
-      </video>
+      <MuxPlayer
+        ref={playerRef}
+        playbackId={playbackId}
+        streamType="on-demand"
+        autoPlay={false}
+        muted={false}
+        // Mux Data: engagement & viewer experience tracking
+        metadata={{
+          video_title: "DOAC Watch Party Screening",
+          viewer_user_id: typeof window !== "undefined" ? localStorage.getItem("viewer_id") || undefined : undefined,
+          video_series: "The Diary of a CEO",
+        }}
+        // Env key for Mux Data (set via environment variable)
+        envKey={process.env.NEXT_PUBLIC_MUX_ENV_KEY}
+        // Styling — minimal chrome for cinema feel
+        primaryColor="#FFFFFF"
+        secondaryColor="#000000"
+        style={{ width: "100%", height: "100%", aspectRatio: "16/9" }}
+      />
     </div>
   );
 }

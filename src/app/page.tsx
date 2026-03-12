@@ -7,6 +7,7 @@ import HostCameraLayer from "@/components/HostCameraLayer";
 import ConversationCardOverlay from "@/components/ConversationCardOverlay";
 import ChatPanel from "@/components/ChatPanel";
 import CinemaCurtains from "@/components/CinemaCurtains";
+import PreShowCountdown from "@/components/PreShowCountdown";
 import IcebreakerFlow from "@/components/IcebreakerFlow";
 import PresenceCounter from "@/components/PresenceCounter";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -27,6 +28,9 @@ export default function Room() {
   const [chatOpen, setChatOpen] = useState(false);
   const [curtainsOpen, setCurtainsOpen] = useState(false);
   const [icebreakerComplete, setIcebreakerComplete] = useState(false);
+  const [countdownStart, setCountdownStart] = useState<number | null>(null);
+  const [countdownDuration, setCountdownDuration] = useState(300);
+  const [countdownDone, setCountdownDone] = useState(false);
   const shownCardIds = useRef<Set<string>>(new Set());
 
   const viewerId = typeof window !== "undefined" ? getViewerId() : "";
@@ -56,6 +60,8 @@ export default function Room() {
         if (data.event_status) setEventStatus(data.event_status);
         if (data.host_layout) setHostLayout(data.host_layout);
         if (data.host_visible !== undefined) setHostVisible(data.host_visible);
+        if (data.countdown_start) setCountdownStart(data.countdown_start);
+        if (data.countdown_duration) setCountdownDuration(data.countdown_duration);
       } catch { /* ignore */ }
     };
     poll();
@@ -63,9 +69,10 @@ export default function Room() {
     return () => clearInterval(interval);
   }, [eventId]);
 
-  // Open curtains when event goes live
+  // Open curtains when event goes live (after countdown completes)
   useEffect(() => {
     if (eventStatus === "live" && !curtainsOpen) {
+      setCountdownDone(true);
       setCurtainsOpen(true);
     }
   }, [eventStatus, curtainsOpen]);
@@ -116,6 +123,15 @@ export default function Room() {
           eventId={eventId}
           viewerId={viewerId}
           onComplete={() => setIcebreakerComplete(true)}
+        />
+      )}
+
+      {/* Pre-Show Countdown (lights dimming, anticipation) */}
+      {icebreakerComplete && eventStatus === "countdown" && countdownStart && !countdownDone && (
+        <PreShowCountdown
+          countdownStart={countdownStart}
+          countdownDuration={countdownDuration}
+          onComplete={() => setCountdownDone(true)}
         />
       )}
 

@@ -12,6 +12,7 @@ export default function AdminDashboard() {
   const [hostLayout, setHostLayout] = useState("pip");
   const [hostVisible, setHostVisible] = useState(true);
   const [viewerCount, setViewerCount] = useState(0);
+  const [countdownMinutes, setCountdownMinutes] = useState("5");
 
   // Cards
   const [cards, setCards] = useState<ConversationCard[]>([]);
@@ -91,19 +92,39 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="text-xs text-[var(--room-text-muted)] block mb-1">Event Status</label>
-                <div className="flex gap-2">
-                  {(["waiting", "live", "ended"] as const).map((s) => (
+                <div className="flex gap-2 flex-wrap">
+                  {(["waiting", "countdown", "live", "ended"] as const).map((s) => (
                     <button
                       key={s}
-                      onClick={() => sendSync({ event_status: s })}
+                      onClick={() => sendSync({
+                        event_status: s,
+                        ...(s === "countdown" ? { countdown_duration: (parseInt(countdownMinutes) || 5) * 60 } : {}),
+                      })}
                       className={`btn-ghost text-xs capitalize ${eventStatus === s ? "border-[var(--room-accent)] text-[var(--room-accent)]" : ""}`}
                     >
                       {s}
                     </button>
                   ))}
                 </div>
+                {eventStatus === "waiting" && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <label className="text-[10px] text-[var(--room-text-muted)]">Countdown:</label>
+                    <input
+                      type="number"
+                      value={countdownMinutes}
+                      onChange={(e) => setCountdownMinutes(e.target.value)}
+                      className="admin-input w-16 text-xs"
+                      min="1"
+                      max="30"
+                    />
+                    <span className="text-[10px] text-[var(--room-text-muted)]">min</span>
+                  </div>
+                )}
                 <p className="text-[10px] text-[var(--room-text-muted)] mt-1">
-                  Setting to &quot;live&quot; opens the cinema curtains for all viewers.
+                  {eventStatus === "waiting" && "Set countdown to start the lights-dimming pre-show experience."}
+                  {eventStatus === "countdown" && "Countdown is running — viewers see lights dimming. Set to \"live\" when ready."}
+                  {eventStatus === "live" && "Curtains are open, video is playing for all viewers."}
+                  {eventStatus === "ended" && "Screening has ended."}
                 </p>
               </div>
             </div>

@@ -10,6 +10,8 @@ interface RoomState {
   event_status: string;
   host_layout: HostLayout;
   host_visible: boolean;
+  countdown_start: number | null;    // epoch ms when countdown was triggered
+  countdown_duration: number;         // countdown duration in seconds (default 300 = 5 min)
 }
 
 const rooms: Record<string, RoomState> = {};
@@ -23,9 +25,11 @@ function getRoom(eventId: string): RoomState {
         rate: 1.0,
         updated_at: Date.now(),
       },
-      event_status: "live",
+      event_status: "waiting",
       host_layout: "pip",
       host_visible: true,
+      countdown_start: null,
+      countdown_duration: 300,
     };
   }
   return rooms[eventId];
@@ -41,6 +45,8 @@ export async function GET(request: NextRequest) {
     event_status: room.event_status,
     host_layout: room.host_layout,
     host_visible: room.host_visible,
+    countdown_start: room.countdown_start,
+    countdown_duration: room.countdown_duration,
   });
 }
 
@@ -74,6 +80,13 @@ export async function POST(request: NextRequest) {
 
   if (body.event_status) {
     room.event_status = body.event_status;
+    if (body.event_status === "countdown") {
+      room.countdown_start = Date.now();
+      room.countdown_duration = body.countdown_duration ?? 300;
+    }
+    if (body.event_status === "live") {
+      room.countdown_start = null;
+    }
   }
 
   if (body.host_layout) {

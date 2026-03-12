@@ -1,6 +1,6 @@
 // ─── Event ───
 
-export type EventStatus = 'waiting' | 'live' | 'ended';
+export type EventStatus = 'waiting' | 'countdown' | 'live' | 'ended';
 
 export interface WatchEvent {
   id: string;
