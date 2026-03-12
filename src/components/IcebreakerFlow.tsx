@@ -5,12 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getViewerName, setViewerName } from "@/lib/viewer";
 
 // DOAC Conversation Cards deck
+// Place card images at public/cards/ with the filenames below
 const ICEBREAKER_CARDS = [
-  { prompt: "When was the last time a day flew by and what were you doing?", author: "Payal Kadakia" },
-  { prompt: "What did you learn from your greatest failure?", author: "Sir Richard Branson" },
-  { prompt: "What are you clear about now that one year ago you didn't know?", author: "Chris Voss" },
-  { prompt: "When was the last time you changed your mind about something life-changing?", author: "Africa Brooke" },
-  { prompt: "Do you think your younger self would be proud / look up to you now?", author: "Lewis Capaldi" },
+  { prompt: "When was the last time a day flew by and what were you doing?", author: "Payal Kadakia", image: "/cards/card-1-payal-kadakia.jpg" },
+  { prompt: "What did you learn from your greatest failure?", author: "Sir Richard Branson", image: "/cards/card-2-richard-branson.jpg" },
+  { prompt: "What are you clear about now that one year ago you didn't know?", author: "Chris Voss", image: "/cards/card-3-chris-voss.jpg" },
+  { prompt: "When was the last time you changed your mind about something life-changing?", author: "Africa Brooke", image: "/cards/card-4-africa-brooke.jpg" },
+  { prompt: "Do you think your younger self would be proud / look up to you now?", author: "Lewis Capaldi", image: "/cards/card-5-lewis-capaldi.jpg" },
 ];
 
 const CARD_DURATION = 120; // 120 seconds per card
@@ -340,19 +341,39 @@ export default function IcebreakerFlow({ eventId, viewerId, onComplete }: Props)
                   </div>
                 </div>
 
-                {/* The card itself */}
-                <div className="icebreaker-card p-8">
-                  <p className="text-[9px] tracking-[0.25em] uppercase text-[var(--room-text-muted)] mb-6 text-center">
-                    The Diary of a CEO Conversation Cards
-                  </p>
-                  <p className="text-xl font-medium leading-relaxed mb-2 icebreaker-prompt text-center">
-                    {card.prompt}
-                  </p>
-                  <p className="text-xs text-[var(--room-text-muted)] mb-8 text-center">
-                    — {card.author}
-                  </p>
+                {/* The card itself — image + input */}
+                <div className="icebreaker-card overflow-hidden">
+                  {/* Card image */}
+                  <div className="relative w-full" style={{ maxHeight: "360px" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={card.image}
+                      alt={`${card.author}: ${card.prompt}`}
+                      className="w-full h-auto object-contain"
+                      style={{ maxHeight: "360px" }}
+                      onError={(e) => {
+                        // Fallback to text if image not found
+                        (e.target as HTMLImageElement).style.display = "none";
+                        const fallback = (e.target as HTMLImageElement).nextElementSibling;
+                        if (fallback) (fallback as HTMLElement).style.display = "block";
+                      }}
+                    />
+                    {/* Text fallback (hidden by default, shown if image fails) */}
+                    <div className="p-8 text-center" style={{ display: "none" }}>
+                      <p className="text-[9px] tracking-[0.25em] uppercase text-[var(--room-text-muted)] mb-6">
+                        The Diary of a CEO Conversation Cards
+                      </p>
+                      <p className="text-xl font-medium leading-relaxed mb-2 icebreaker-prompt">
+                        {card.prompt}
+                      </p>
+                      <p className="text-xs text-[var(--room-text-muted)]">
+                        — {card.author}
+                      </p>
+                    </div>
+                  </div>
 
-                  <div className="space-y-3">
+                  {/* Input area */}
+                  <div className="p-6 space-y-3">
                     <input
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
