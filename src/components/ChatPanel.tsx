@@ -141,7 +141,7 @@ export default function ChatPanel({ eventId, isOpen, onToggle }: Props) {
                   <div
                     className={`mt-0.5 inline-block px-3 py-1.5 rounded-xl text-xs max-w-[85%] ${
                       msg.viewer_id === viewerId
-                        ? "bg-[var(--room-accent)] text-white rounded-br-sm"
+                        ? "bg-[var(--room-surface-hover)] text-[var(--room-text)] border border-[var(--room-border-active)] rounded-br-sm"
                         : "bg-[var(--room-surface)] text-[var(--room-text)] rounded-bl-sm"
                     }`}
                   >

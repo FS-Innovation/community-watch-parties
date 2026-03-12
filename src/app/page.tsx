@@ -7,7 +7,9 @@ import HostCameraLayer from "@/components/HostCameraLayer";
 import ConversationCardOverlay from "@/components/ConversationCardOverlay";
 import ChatPanel from "@/components/ChatPanel";
 import CinemaCurtains from "@/components/CinemaCurtains";
+import IcebreakerFlow from "@/components/IcebreakerFlow";
 import PresenceCounter from "@/components/PresenceCounter";
+import ThemeToggle from "@/components/ThemeToggle";
 import type { SyncState, ConversationCard, HostLayout, ReactionEmoji } from "@/lib/types";
 import { getViewerId } from "@/lib/viewer";
 
@@ -24,6 +26,7 @@ export default function Room() {
   const [currentTime, setCurrentTime] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
   const [curtainsOpen, setCurtainsOpen] = useState(false);
+  const [icebreakerComplete, setIcebreakerComplete] = useState(false);
   const shownCardIds = useRef<Set<string>>(new Set());
 
   const viewerId = typeof window !== "undefined" ? getViewerId() : "";
@@ -107,6 +110,15 @@ export default function Room() {
 
   return (
     <main className="h-screen w-screen flex flex-col overflow-hidden bg-[var(--room-bg)]">
+      {/* Icebreaker Flow (shown first, before the screening) */}
+      {!icebreakerComplete && (
+        <IcebreakerFlow
+          eventId={eventId}
+          viewerId={viewerId}
+          onComplete={() => setIcebreakerComplete(true)}
+        />
+      )}
+
       {/* Cinema Curtains */}
       <CinemaCurtains isOpen={curtainsOpen} />
 
@@ -117,9 +129,9 @@ export default function Room() {
             BTD Screening
           </span>
           {eventStatus === "live" && (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/25">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500" style={{ animation: "pulse-dot 1.5s infinite" }} />
-              <span className="text-[11px] text-red-400 font-medium">LIVE</span>
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+              <span className="w-1.5 h-1.5 rounded-full bg-white/60" style={{ animation: "pulse-dot 1.5s infinite" }} />
+              <span className="text-[11px] text-white/60 font-medium tracking-wider">LIVE</span>
             </div>
           )}
           {eventStatus === "waiting" && (
@@ -129,7 +141,10 @@ export default function Room() {
             <span className="text-xs text-[var(--room-text-muted)]">Ended</span>
           )}
         </div>
-        <PresenceCounter eventId={eventId} />
+        <div className="flex items-center gap-3">
+          <PresenceCounter eventId={eventId} />
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* ─── Main Content ─── */}

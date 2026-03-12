@@ -1,21 +1,50 @@
 @import "tailwindcss";
 
 :root {
-  --room-bg: #06060a;
-  --room-surface: #0f0f18;
-  --room-surface-hover: #16162a;
-  --room-panel: rgba(15, 15, 24, 0.95);
-  --room-panel-light: rgba(22, 22, 42, 0.85);
+  --room-bg: #08080c;
+  --room-surface: #111116;
+  --room-surface-hover: #1a1a22;
+  --room-panel: rgba(14, 14, 20, 0.95);
+  --room-panel-light: rgba(20, 20, 28, 0.85);
   --room-border: rgba(255, 255, 255, 0.06);
-  --room-border-active: rgba(255, 255, 255, 0.15);
-  --room-accent: #e8734a;
-  --room-accent-glow: rgba(232, 115, 74, 0.2);
-  --room-gold: #d4a853;
+  --room-border-active: rgba(255, 255, 255, 0.12);
+  --room-accent: #c8c8d0;
+  --room-accent-glow: rgba(255, 255, 255, 0.06);
+  --room-gold: #a0a0a8;
   --room-text: #e8e8f0;
-  --room-text-secondary: #9898b0;
-  --room-text-muted: #5a5a72;
-  --room-green: #10B981;
-  --room-red: #EF4444;
+  --room-text-secondary: #9898a8;
+  --room-text-muted: #505060;
+  --room-green: #7a7a88;
+  --room-red: #a0a0a8;
+}
+
+/* ─── Light Mode ─── */
+[data-theme="light"] {
+  --room-bg: #f5f5f5;
+  --room-surface: #ffffff;
+  --room-surface-hover: #ebebeb;
+  --room-panel: rgba(255, 255, 255, 0.95);
+  --room-panel-light: rgba(245, 245, 245, 0.85);
+  --room-border: rgba(0, 0, 0, 0.08);
+  --room-border-active: rgba(0, 0, 0, 0.15);
+  --room-accent: #333333;
+  --room-accent-glow: rgba(0, 0, 0, 0.04);
+  --room-gold: #666666;
+  --room-text: #1a1a1a;
+  --room-text-secondary: #555555;
+  --room-text-muted: #999999;
+  --room-green: #666666;
+  --room-red: #666666;
+}
+
+[data-theme="light"] .curtain-panel {
+  background: linear-gradient(180deg, #2a0808 0%, #3d1010 30%, #4d1818 60%, #3d1010 100%);
+}
+
+[data-theme="light"] html,
+[data-theme="light"] body {
+  background: var(--room-bg);
+  color: var(--room-text);
 }
 
 * { box-sizing: border-box; }
@@ -103,9 +132,9 @@ html, body {
   gap: 6px;
   padding: 5px 12px;
   border-radius: 20px;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.15);
-  color: var(--room-green);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--room-text-secondary);
   font-size: 13px;
   font-weight: 500;
 }
@@ -113,7 +142,7 @@ html, body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--room-green);
+  background: rgba(255, 255, 255, 0.4);
   animation: pulse-dot 2s infinite;
 }
 
@@ -152,8 +181,8 @@ html, body {
 
 /* ─── Buttons ─── */
 .btn-accent {
-  background: var(--room-accent);
-  color: white;
+  background: var(--room-text);
+  color: var(--room-bg);
   font-weight: 600;
   padding: 8px 18px;
   border-radius: 8px;
@@ -162,8 +191,8 @@ html, body {
   font-size: 13px;
   transition: all 0.15s;
 }
-.btn-accent:hover { filter: brightness(1.1); }
-.btn-accent:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-accent:hover { opacity: 0.9; }
+.btn-accent:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .btn-ghost {
   background: transparent;
@@ -300,4 +329,27 @@ html, body {
   background: var(--room-panel);
   backdrop-filter: blur(24px);
   border-left: 1px solid var(--room-border);
+}
+
+/* ─── Icebreaker Cards ─── */
+.icebreaker-card {
+  background: var(--room-panel);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--room-border-active);
+  border-radius: 20px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+}
+
+.icebreaker-prompt {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+}
+
+/* ─── Match Card ─── */
+.match-card {
+  background: var(--room-panel);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
 }
