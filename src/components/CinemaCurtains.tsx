@@ -52,7 +52,7 @@ export default function CinemaCurtains({ isOpen }: Props) {
                 className="mt-4 flex items-center justify-center gap-2"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
-                <span className="text-[11px] text-[var(--room-text-muted)]">Waiting for the host</span>
+                <span className="text-[11px] text-[var(--room-text-muted)]">Get ready</span>
               </motion.div>
             </div>
           </motion.div>

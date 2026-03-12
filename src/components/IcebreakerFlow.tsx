@@ -217,7 +217,7 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
   const bgDarkness = Math.min(0.85, countdownProgress * 0.85);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{
+    <div className="fixed inset-0 z-[70] flex items-center justify-center" style={{
       background: `radial-gradient(ellipse at center, rgba(10, 10, 10, ${0.92 + bgDarkness * 0.08}) 0%, rgba(5, 5, 5, ${0.95 + bgDarkness * 0.05}) 100%)`,
     }}>
       <AnimatePresence mode="wait">
