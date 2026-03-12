@@ -13,6 +13,7 @@ export default function AdminDashboard() {
   const [hostVisible, setHostVisible] = useState(true);
   const [viewerCount, setViewerCount] = useState(0);
   const [countdownMinutes, setCountdownMinutes] = useState("5");
+  const [curtainsOpen, setCurtainsOpen] = useState(false);
 
   // Cards
   const [cards, setCards] = useState<ConversationCard[]>([]);
@@ -34,6 +35,7 @@ export default function AdminDashboard() {
       if (syncData.event_status) setEventStatus(syncData.event_status);
       if (syncData.host_layout) setHostLayout(syncData.host_layout);
       if (syncData.host_visible !== undefined) setHostVisible(syncData.host_visible);
+      if (syncData.curtains_open !== undefined) setCurtainsOpen(syncData.curtains_open);
       setViewerCount(presenceData.count || 0);
     } catch { /* ignore */ }
   }, [eventId]);
@@ -125,6 +127,27 @@ export default function AdminDashboard() {
                   {eventStatus === "countdown" && "Countdown is running — viewers see lights dimming. Set to \"live\" when ready."}
                   {eventStatus === "live" && "Curtains are open, video is playing for all viewers."}
                   {eventStatus === "ended" && "Screening has ended."}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs text-[var(--room-text-muted)] block mb-1">Curtains</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => sendSync({ curtains_open: false })}
+                    className={`btn-ghost text-xs ${!curtainsOpen ? "border-[var(--room-accent)] text-[var(--room-accent)]" : ""}`}
+                  >
+                    Closed
+                  </button>
+                  <button
+                    onClick={() => sendSync({ curtains_open: true })}
+                    className={`btn-ghost text-xs ${curtainsOpen ? "border-[var(--room-green)] text-[var(--room-green)]" : ""}`}
+                  >
+                    Open
+                  </button>
+                </div>
+                <p className="text-[10px] text-[var(--room-text-muted)] mt-1">
+                  Toggle curtains on/off for all viewers. Auto-opens when set to &quot;live&quot;.
                 </p>
               </div>
             </div>

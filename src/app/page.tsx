@@ -62,6 +62,7 @@ export default function Room() {
         if (data.host_visible !== undefined) setHostVisible(data.host_visible);
         if (data.countdown_start) setCountdownStart(data.countdown_start);
         if (data.countdown_duration) setCountdownDuration(data.countdown_duration);
+        if (data.curtains_open !== undefined) setCurtainsOpen(data.curtains_open);
       } catch { /* ignore */ }
     };
     poll();
@@ -69,13 +70,12 @@ export default function Room() {
     return () => clearInterval(interval);
   }, [eventId]);
 
-  // Open curtains when event goes live (after countdown completes)
+  // Mark countdown done when event goes live
   useEffect(() => {
-    if (eventStatus === "live" && !curtainsOpen) {
+    if (eventStatus === "live") {
       setCountdownDone(true);
-      setCurtainsOpen(true);
     }
-  }, [eventStatus, curtainsOpen]);
+  }, [eventStatus]);
 
   // Check for conversation cards based on playback time
   useEffect(() => {

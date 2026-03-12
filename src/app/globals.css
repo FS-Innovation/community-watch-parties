@@ -38,7 +38,7 @@
 }
 
 [data-theme="light"] .curtain-panel {
-  background: linear-gradient(180deg, #2a0808 0%, #3d1010 30%, #4d1818 60%, #3d1010 100%);
+  background: linear-gradient(180deg, #0a0a0a 0%, #141414 30%, #1a1a1a 60%, #141414 100%);
 }
 
 [data-theme="light"] html,
@@ -297,31 +297,31 @@ html, body {
   z-index: 20;
 }
 
-/* ─── Cinema Curtains ─── */
+/* ─── Cinema Curtains (DOAC black/gold) ─── */
 .curtain-panel {
-  background: linear-gradient(180deg, #1a0505 0%, #2d0a0a 30%, #3d1010 60%, #2d0a0a 100%);
+  background: linear-gradient(180deg, #0a0a0a 0%, #141414 30%, #1a1a1a 60%, #141414 100%);
 }
 
 .curtain-fabric {
   background: repeating-linear-gradient(
     90deg,
-    rgba(80, 15, 15, 0.4) 0px,
-    rgba(60, 10, 10, 0.2) 8px,
-    rgba(80, 15, 15, 0.4) 16px
+    rgba(40, 40, 40, 0.5) 0px,
+    rgba(20, 20, 20, 0.3) 8px,
+    rgba(40, 40, 40, 0.5) 16px
   );
 }
 
 .curtain-fold {
-  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.4));
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.5));
 }
 
 .curtain-fold-left {
-  background: linear-gradient(270deg, transparent, rgba(0, 0, 0, 0.4));
+  background: linear-gradient(270deg, transparent, rgba(0, 0, 0, 0.5));
 }
 
 .curtain-valance {
-  background: linear-gradient(180deg, #1a0505, #2d0a0a);
-  border-bottom: 3px solid rgba(212, 168, 83, 0.3);
+  background: linear-gradient(180deg, #0a0a0a, #141414);
+  border-bottom: 3px solid rgba(212, 168, 83, 0.25);
 }
 
 /* ─── Chat Panel ─── */

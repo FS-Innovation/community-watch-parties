@@ -12,6 +12,7 @@ interface RoomState {
   host_visible: boolean;
   countdown_start: number | null;    // epoch ms when countdown was triggered
   countdown_duration: number;         // countdown duration in seconds (default 300 = 5 min)
+  curtains_open: boolean;             // admin toggle for curtains
 }
 
 const rooms: Record<string, RoomState> = {};
@@ -30,6 +31,7 @@ function getRoom(eventId: string): RoomState {
       host_visible: true,
       countdown_start: null,
       countdown_duration: 300,
+      curtains_open: false,
     };
   }
   return rooms[eventId];
@@ -47,6 +49,7 @@ export async function GET(request: NextRequest) {
     host_visible: room.host_visible,
     countdown_start: room.countdown_start,
     countdown_duration: room.countdown_duration,
+    curtains_open: room.curtains_open,
   });
 }
 
@@ -86,7 +89,15 @@ export async function POST(request: NextRequest) {
     }
     if (body.event_status === "live") {
       room.countdown_start = null;
+      room.curtains_open = true;
     }
+    if (body.event_status === "waiting") {
+      room.curtains_open = false;
+    }
+  }
+
+  if (body.curtains_open !== undefined) {
+    room.curtains_open = body.curtains_open;
   }
 
   if (body.host_layout) {
