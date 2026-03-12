@@ -3,9 +3,15 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
+const PLACEHOLDER_URL = "https://placeholder.supabase.co";
+const PLACEHOLDER_KEY = "placeholder-key";
+
+export const isSupabaseConfigured =
+  !!supabaseUrl && supabaseUrl !== "your_supabase_url";
+
 function createSupabaseClient(): SupabaseClient {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return createClient("https://placeholder.supabase.co", "placeholder-key");
+  if (!isSupabaseConfigured) {
+    return createClient(PLACEHOLDER_URL, PLACEHOLDER_KEY);
   }
   return createClient(supabaseUrl, supabaseAnonKey);
 }
@@ -13,8 +19,8 @@ function createSupabaseClient(): SupabaseClient {
 export const supabase = createSupabaseClient();
 
 export function createServerSupabase() {
-  if (!supabaseUrl) {
-    return createClient("https://placeholder.supabase.co", "placeholder-key", {
+  if (!isSupabaseConfigured) {
+    return createClient(PLACEHOLDER_URL, PLACEHOLDER_KEY, {
       auth: { persistSession: false },
     });
   }

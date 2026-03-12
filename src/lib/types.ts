@@ -1,208 +1,68 @@
-// ─── Database Types ───
+// ─── Event ───
 
-export type EventStatus = 'draft' | 'registration' | 'confirmed' | 'live' | 'ended';
-export type RegistrationStatus = 'pending' | 'accepted' | 'waitlisted';
-export type SegmentType = 'meaning-seeker' | 'builder' | 'creative' | 'connector';
-export type RoomType = 'interest' | 'geography' | 'global';
-export type RoomStatus = 'filling' | 'open' | 'merged' | 'closed';
-export type MatchStatus = 'pending' | 'accepted' | 'declined';
-export type CardResponseType = 'text' | 'emoji' | 'choice';
+export type EventStatus = 'waiting' | 'live' | 'ended';
 
-export interface Event {
+export interface WatchEvent {
   id: string;
   title: string;
-  episode_id: string | null;
-  status: EventStatus;
-  threshold: number;
-  screening_date: string | null;
   mux_playback_id: string | null;
-  mux_asset_id: string | null;
-  livekit_room_name: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Registration {
-  id: string;
-  event_id: string;
-  email: string;
-  first_name: string;
-  city: string | null;
-  timezone: string | null;
-  ticket_number: number | null;
-  seat_code: string | null;
-  screen_choice: string;
-  room_id: string | null;
-  status: RegistrationStatus;
-  referral_code: string;
-  referred_by: string | null;
-  access_token: string;
-  role: string;
+  status: EventStatus;
   created_at: string;
 }
 
-export interface SignalResponse {
-  id: string;
-  registration_id: string;
-  question_key: string;
-  answer_text: string;
-  ai_tags: Record<string, unknown>;
-  segment_tag: string | null;
-  confidence_score: number | null;
-  created_at: string;
+// ─── Sync State (broadcast via Supabase Realtime) ───
+
+export interface SyncState {
+  timestamp: number;     // current playback position in seconds
+  state: 'playing' | 'paused';
+  rate: number;          // playback rate (1.0 normal)
+  updated_at: number;    // epoch ms when this was sent
 }
 
-export interface Segment {
-  id: string;
-  registration_id: string;
-  primary_segment: SegmentType;
-  geography_cluster: string | null;
-  intent_level: string;
-}
+// ─── Conversation Cards + Interactive Moments ───
 
-export interface Room {
-  id: string;
-  event_id: string;
-  name: string;
-  screen_label: string;
-  type: RoomType;
-  whatsapp_invite_link: string | null;
-  capacity: number;
-  current_count: number;
-  min_threshold: number;
-  status: RoomStatus;
-}
-
-export interface EventEngagement {
-  id: string;
-  registration_id: string;
-  event_id: string;
-  reactions_count: number;
-  cards_responded: number;
-  qa_submitted: number;
-  qa_upvotes: number;
-  watch_duration_seconds: number;
-  engagement_score: number;
-}
-
-export interface MatchRecommendation {
-  id: string;
-  event_id: string;
-  user_a_id: string;
-  user_b_id: string;
-  match_reason: string;
-  status: MatchStatus;
-  created_at: string;
-}
+export type CardType = 'card' | 'quiz' | 'poll' | 'replay' | 'teaser';
+export type ResponseType = 'text' | 'emoji_choice' | 'multiple_choice';
 
 export interface ConversationCard {
   id: string;
   event_id: string;
+  type: CardType;
   trigger_time_seconds: number;
   prompt_text: string;
-  response_type: CardResponseType;
-  choices: string[] | null;
+  options: string[] | null;       // for quiz/poll/multiple_choice
+  response_type: ResponseType;
+  auto_dismiss_seconds: number;
+  show_results: boolean;
   is_active: boolean;
+  sort_order: number;
 }
 
-export interface Question {
+export interface CardResponse {
+  id: string;
+  card_id: string;
+  event_id: string;
+  viewer_id: string;
+  response_value: string;
+  responded_at: string;
+}
+
+// ─── Q&A ───
+
+export type QuestionStatus = 'visible' | 'selected' | 'answered' | 'hidden';
+
+export interface QAQuestion {
   id: string;
   event_id: string;
-  registration_id: string;
-  question: string;
-  upvotes: number;
-  is_answered: boolean;
+  viewer_id: string;
+  display_name: string;
+  question_text: string;
+  upvote_count: number;
+  status: QuestionStatus;
   created_at: string;
 }
 
-// ─── Screen Definitions ───
-
-export interface Screen {
-  id: string;
-  name: string;
-  description: string;
-  segment: SegmentType;
-  type: RoomType;
-  icon: string;
-  color: string;
-}
-
-export const SCREENS: Screen[] = [
-  {
-    id: 'reflection-room',
-    name: 'The Reflection Room',
-    description: 'For those who watch to feel something deeper',
-    segment: 'meaning-seeker',
-    type: 'interest',
-    icon: '🪞',
-    color: '#8B5CF6',
-  },
-  {
-    id: 'founders-den',
-    name: "Founder's Den",
-    description: 'Watch with people building something of their own',
-    segment: 'builder',
-    type: 'interest',
-    icon: '🔥',
-    color: '#F59E0B',
-  },
-  {
-    id: 'creative-studio',
-    name: 'Creative Studio',
-    description: 'For the storytellers, makers, and craft-obsessed',
-    segment: 'creative',
-    type: 'interest',
-    icon: '🎬',
-    color: '#EC4899',
-  },
-  {
-    id: 'the-collective',
-    name: 'The Collective',
-    description: 'Come for the episode, stay for the people',
-    segment: 'connector',
-    type: 'global',
-    icon: '🤝',
-    color: '#06B6D4',
-  },
-  {
-    id: 'locals-london',
-    name: 'Locals: London',
-    description: 'Your London watch party crew',
-    segment: 'connector',
-    type: 'geography',
-    icon: '📍',
-    color: '#10B981',
-  },
-  {
-    id: 'locals-nyc',
-    name: 'Locals: NYC',
-    description: 'New York, same room',
-    segment: 'connector',
-    type: 'geography',
-    icon: '📍',
-    color: '#10B981',
-  },
-  {
-    id: 'night-owls',
-    name: 'Night Owls',
-    description: 'Late-night thinkers and overthinkers',
-    segment: 'meaning-seeker',
-    type: 'interest',
-    icon: '🌙',
-    color: '#6366F1',
-  },
-  {
-    id: 'the-lab',
-    name: 'The Lab',
-    description: 'AI, tech, and what comes next',
-    segment: 'builder',
-    type: 'interest',
-    icon: '🧪',
-    color: '#14B8A6',
-  },
-];
-
-// ─── Reaction Types ───
+// ─── Reactions ───
 
 export const REACTIONS = [
   { emoji: '🔥', label: 'Fire' },
@@ -212,4 +72,8 @@ export const REACTIONS = [
   { emoji: '👏', label: 'Clapping' },
 ] as const;
 
-export type ReactionType = typeof REACTIONS[number]['emoji'];
+export type ReactionEmoji = typeof REACTIONS[number]['emoji'];
+
+// ─── Host Camera Layout ───
+
+export type HostLayout = 'pip' | 'side';

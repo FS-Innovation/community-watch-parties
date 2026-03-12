@@ -2,14 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Community Watch Party — BTD Exclusive Screening",
-  description:
-    "An exclusive virtual screening experience. Watch together with a curated community of like-minded people.",
-  openGraph: {
-    title: "Community Watch Party — BTD Exclusive Screening",
-    description:
-      "Join the premiere screening. Pick your room. Meet your people.",
-  },
+  title: "Watch Party — BTD Screening Room",
+  description: "A virtual screening room. Watch together in sync.",
 };
 
 export default function RootLayout({
@@ -19,7 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body>{children}</body>
     </html>
   );
 }
