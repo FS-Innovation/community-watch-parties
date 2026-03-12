@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DOAC Watch Party — The Diary of a CEO",
+  title: "Community Watch Party — BTD Exclusive Screening",
   description:
-    "Join the cinematic watch party experience. Watch together, react together, connect together.",
+    "An exclusive virtual screening experience. Watch together with a curated community of like-minded people.",
   openGraph: {
-    title: "DOAC Watch Party",
-    description: "A cinematic watch party experience by The Diary of a CEO",
+    title: "Community Watch Party — BTD Exclusive Screening",
+    description:
+      "Join the premiere screening. Pick your room. Meet your people.",
   },
 };
 

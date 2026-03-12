@@ -1,232 +1,236 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { motion } from "framer-motion";
+import type { Screen, Registration, Room } from "@/lib/types";
 
-const LIFE_STAGES = [
-  "Student",
-  "Early Career",
-  "Building a Business",
-  "Established Professional",
-  "Career Pivot",
-  "Creative / Freelance",
-  "Retired / Exploring",
-  "Prefer not to say",
-];
+interface Props {
+  screen: Screen;
+  onComplete: (registration: Registration, room?: Room) => void;
+  onBack: () => void;
+}
 
-export default function RegistrationForm() {
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    life_stage: "",
-    building: "",
-    question_for_steven: "",
-    location: "",
-  });
-  const [status, setStatus] = useState<
-    "idle" | "submitting" | "success" | "error"
-  >("idle");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [accessToken, setAccessToken] = useState("");
-  const [seatNumber, setSeatNumber] = useState<number | null>(null);
+export default function RegistrationForm({ screen, onComplete, onBack }: Props) {
+  const [formStep, setFormStep] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  function handleChange(
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  }
+  const [firstName, setFirstName] = useState("");
+  const [email, setEmail] = useState("");
+  const [city, setCity] = useState("");
+  const [attention, setAttention] = useState("");
+  const [worthTime, setWorthTime] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus("submitting");
-    setErrorMessage("");
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setError("");
 
     try {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          first_name: firstName,
+          email,
+          city,
+          screen_choice: screen.id,
+          attention,
+          worth_time: worthTime,
+        }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Registration failed");
-      }
-
       const data = await res.json();
-      setAccessToken(data.token);
-      setSeatNumber(data.seatNumber || null);
-      setStatus("success");
+      if (!res.ok) throw new Error(data.error || "Registration failed");
+
+      onComplete(data.registration, data.room);
     } catch (err) {
-      setStatus("error");
-      setErrorMessage(
-        err instanceof Error ? err.message : "Something went wrong"
-      );
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setSubmitting(false);
     }
-  }
+  };
 
-  if (status === "success") {
-    return (
-      <div className="glass-panel rounded-2xl p-8 text-center animate-fade-in max-w-lg mx-auto">
-        <div className="text-4xl mb-4">🎬</div>
-        <h2 className="text-2xl font-bold mb-2">You&apos;re in.</h2>
-        {seatNumber && (
-          <p className="text-[var(--doac-orange)] text-lg font-semibold mb-2">
-            Seat #{seatNumber}
-          </p>
-        )}
-        <p className="text-[var(--doac-text-muted)] mb-6">
-          {seatNumber
-            ? `You've been assigned Seat #${seatNumber}. When the show starts, you'll be automatically placed in your seat.`
-            : "Check your email for your unique access link. See you at the screening."}
-        </p>
-        {accessToken && (
-          <Link
-            href={`/watch/${accessToken}`}
-            className="inline-block px-6 py-3 rounded-lg bg-[var(--doac-orange)] text-white font-semibold hover:brightness-110 transition-all"
-          >
-            Enter the Watch Room
-          </Link>
-        )}
+  const steps = [
+    // Step 0: Identity
+    <motion.div
+      key="identity"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+    >
+      <p className="text-sm text-[var(--cwp-text-muted)] mb-6">
+        Quick — just so we know who to save a seat for.
+      </p>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-[var(--cwp-text-secondary)] mb-1.5">
+            First name
+          </label>
+          <input
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            className="input-field"
+            placeholder="Your first name"
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[var(--cwp-text-secondary)] mb-1.5">
+            Email
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="input-field"
+            placeholder="your@email.com"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[var(--cwp-text-secondary)] mb-1.5">
+            City
+          </label>
+          <input
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            className="input-field"
+            placeholder="Where are you watching from?"
+          />
+        </div>
       </div>
-    );
-  }
+      <button
+        onClick={() => setFormStep(1)}
+        disabled={!firstName.trim() || !email.trim()}
+        className="btn-primary w-full mt-6"
+      >
+        Continue
+      </button>
+    </motion.div>,
 
-  const inputClass =
-    "w-full px-4 py-3 rounded-lg bg-[var(--doac-dark)] border border-[var(--doac-border)] text-[var(--doac-text)] placeholder:text-[var(--doac-text-muted)] focus:outline-none focus:border-[var(--doac-orange)] focus:ring-1 focus:ring-[var(--doac-orange)] transition-colors";
+    // Step 1: What caught your attention
+    <motion.div
+      key="attention"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+    >
+      <p className="text-sm text-[var(--cwp-text-muted)] mb-6">
+        Two quick questions — helps us make the experience better.
+      </p>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-[var(--cwp-text-secondary)] mb-1.5">
+            What caught your attention about this?
+          </label>
+          <textarea
+            value={attention}
+            onChange={(e) => setAttention(e.target.value)}
+            className="input-field resize-none"
+            rows={3}
+            placeholder="Be honest — what made you click?"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[var(--cwp-text-secondary)] mb-1.5">
+            What would make this worth your time tonight?
+          </label>
+          <textarea
+            value={worthTime}
+            onChange={(e) => setWorthTime(e.target.value)}
+            className="input-field resize-none"
+            rows={3}
+            placeholder="What are you hoping to get out of it?"
+          />
+        </div>
+      </div>
+      <div className="flex gap-3 mt-6">
+        <button onClick={() => setFormStep(0)} className="btn-secondary flex-1">
+          Back
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="btn-primary flex-1"
+        >
+          {submitting ? "Securing your seat..." : "Claim My Seat"}
+        </button>
+      </div>
+    </motion.div>,
+  ];
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="glass-panel rounded-2xl p-8 space-y-5 max-w-lg mx-auto animate-fade-in-delay-2"
-    >
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium mb-1.5">
-          Name
-        </label>
-        <input
-          id="name"
-          name="name"
-          type="text"
-          required
-          placeholder="Your name"
-          value={formData.name}
-          onChange={handleChange}
-          className={inputClass}
-        />
-      </div>
-
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium mb-1.5">
-          Email
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          required
-          placeholder="you@example.com"
-          value={formData.email}
-          onChange={handleChange}
-          className={inputClass}
-        />
-      </div>
-
-      <div>
-        <label
-          htmlFor="life_stage"
-          className="block text-sm font-medium mb-1.5"
+    <div className="min-h-screen flex items-center justify-center px-4 py-16">
+      <div className="w-full max-w-md">
+        {/* Screen badge */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
         >
-          Where are you in life right now?
-        </label>
-        <select
-          id="life_stage"
-          name="life_stage"
-          required
-          value={formData.life_stage}
-          onChange={handleChange}
-          className={inputClass}
+          <button
+            onClick={onBack}
+            className="text-sm text-[var(--cwp-text-muted)] hover:text-[var(--cwp-text)] transition-colors mb-4 inline-flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Change screen
+          </button>
+          <div
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium"
+            style={{
+              color: screen.color,
+              background: `${screen.color}12`,
+              border: `1px solid ${screen.color}30`,
+            }}
+          >
+            <span>{screen.icon}</span>
+            <span>{screen.name}</span>
+          </div>
+        </motion.div>
+
+        {/* Form panel */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glass-panel p-8"
         >
-          <option value="" disabled>
-            Select your life stage
-          </option>
-          {LIFE_STAGES.map((stage) => (
-            <option key={stage} value={stage}>
-              {stage}
-            </option>
-          ))}
-        </select>
+          <h2 className="text-xl font-semibold mb-1">Book your seat</h2>
+          <div className="flex items-center gap-2 mb-6">
+            <div className="flex gap-1">
+              {[0, 1].map((s) => (
+                <div
+                  key={s}
+                  className="h-1 w-8 rounded-full transition-colors"
+                  style={{
+                    background:
+                      s <= formStep
+                        ? "var(--cwp-gold)"
+                        : "var(--cwp-border-subtle)",
+                  }}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-[var(--cwp-text-muted)]">
+              {formStep + 1}/2
+            </span>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          {steps[formStep]}
+        </motion.div>
+
+        <p className="text-xs text-center text-[var(--cwp-text-muted)] mt-4 px-4">
+          By registering you agree to our privacy policy. Your data is used to deliver the screening experience and match you with relevant connections.
+        </p>
       </div>
-
-      <div>
-        <label htmlFor="building" className="block text-sm font-medium mb-1.5">
-          What are you building?
-        </label>
-        <textarea
-          id="building"
-          name="building"
-          required
-          rows={2}
-          placeholder="A business, a skill, a new chapter..."
-          value={formData.building}
-          onChange={handleChange}
-          className={inputClass + " resize-none"}
-        />
-      </div>
-
-      <div>
-        <label
-          htmlFor="question_for_steven"
-          className="block text-sm font-medium mb-1.5"
-        >
-          One question for Steven
-        </label>
-        <textarea
-          id="question_for_steven"
-          name="question_for_steven"
-          required
-          rows={2}
-          placeholder="If you had 30 seconds with Steven, what would you ask?"
-          value={formData.question_for_steven}
-          onChange={handleChange}
-          className={inputClass + " resize-none"}
-        />
-      </div>
-
-      <div>
-        <label htmlFor="location" className="block text-sm font-medium mb-1.5">
-          Location
-        </label>
-        <input
-          id="location"
-          name="location"
-          type="text"
-          required
-          placeholder="City, Country"
-          value={formData.location}
-          onChange={handleChange}
-          className={inputClass}
-        />
-      </div>
-
-      {status === "error" && (
-        <p className="text-red-400 text-sm text-center">{errorMessage}</p>
-      )}
-
-      <button
-        type="submit"
-        disabled={status === "submitting"}
-        className="w-full py-3.5 rounded-lg font-semibold text-white bg-[var(--doac-orange)] hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
-      >
-        {status === "submitting" ? "Claiming your spot..." : "Claim Your Spot"}
-      </button>
-
-      <p className="text-xs text-center text-[var(--doac-text-muted)]">
-        By registering you agree to our privacy policy. Your data is stored
-        securely and never shared with third parties.
-      </p>
-    </form>
+    </div>
   );
 }
