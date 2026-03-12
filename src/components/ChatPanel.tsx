@@ -85,7 +85,7 @@ export default function ChatPanel({ eventId, isOpen, onToggle }: Props) {
       {/* Toggle button */}
       <button
         onClick={onToggle}
-        className="fixed bottom-6 right-6 z-30 w-12 h-12 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)] flex items-center justify-center hover:border-[var(--room-accent)] transition-colors shadow-lg"
+        className="fixed bottom-6 right-6 z-[55] w-12 h-12 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)] flex items-center justify-center hover:border-[var(--room-accent)] transition-colors shadow-lg"
         title={isOpen ? "Close chat" : "Open chat"}
       >
         <svg className="w-5 h-5 text-[var(--room-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,7 +110,7 @@ export default function ChatPanel({ eventId, isOpen, onToggle }: Props) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed top-0 right-0 bottom-0 w-80 lg:w-96 z-30 flex flex-col chat-panel"
+            className="fixed top-0 right-0 bottom-0 w-80 lg:w-96 z-[55] flex flex-col chat-panel"
           >
             {/* Header */}
             <div className="p-4 border-b border-[var(--room-border)] flex items-center justify-between flex-shrink-0">

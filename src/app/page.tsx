@@ -7,14 +7,15 @@ import HostCameraLayer from "@/components/HostCameraLayer";
 import ConversationCardOverlay from "@/components/ConversationCardOverlay";
 import ChatPanel from "@/components/ChatPanel";
 import CinemaCurtains from "@/components/CinemaCurtains";
-import PreShowCountdown from "@/components/PreShowCountdown";
 import IcebreakerFlow from "@/components/IcebreakerFlow";
 import PresenceCounter from "@/components/PresenceCounter";
 import ThemeToggle from "@/components/ThemeToggle";
+import HostControlsPanel from "@/components/HostControlsPanel";
 import type { SyncState, ConversationCard, HostLayout, ReactionEmoji } from "@/lib/types";
 import { getViewerId } from "@/lib/viewer";
 
 const DEMO_EVENT_ID = "demo-event";
+const DEFAULT_COUNTDOWN = 300; // 5 minutes
 
 export default function Room() {
   const [eventId] = useState(DEMO_EVENT_ID);
@@ -29,13 +30,35 @@ export default function Room() {
   const [curtainsOpen, setCurtainsOpen] = useState(false);
   const [icebreakerComplete, setIcebreakerComplete] = useState(false);
   const [countdownStart, setCountdownStart] = useState<number | null>(null);
-  const [countdownDuration, setCountdownDuration] = useState(300);
-  const [countdownDone, setCountdownDone] = useState(false);
+  const [countdownDuration, setCountdownDuration] = useState(DEFAULT_COUNTDOWN);
+  const [hostPanelOpen, setHostPanelOpen] = useState(false);
   const shownCardIds = useRef<Set<string>>(new Set());
+  const autoStartedRef = useRef(false);
 
   const viewerId = typeof window !== "undefined" ? getViewerId() : "";
 
-  // Fetch event info
+  // ─── Poll sync state ───
+  const poll = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/sync?event_id=${eventId}`);
+      const data = await res.json();
+      if (data.sync) setSyncState(data.sync);
+      if (data.event_status) setEventStatus(data.event_status);
+      if (data.host_layout) setHostLayout(data.host_layout);
+      if (data.host_visible !== undefined) setHostVisible(data.host_visible);
+      if (data.countdown_start) setCountdownStart(data.countdown_start);
+      if (data.countdown_duration) setCountdownDuration(data.countdown_duration);
+      if (data.curtains_open !== undefined) setCurtainsOpen(data.curtains_open);
+    } catch { /* ignore */ }
+  }, [eventId]);
+
+  useEffect(() => {
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [poll]);
+
+  // ─── Fetch event info (playback ID) ───
   useEffect(() => {
     async function loadEvent() {
       try {
@@ -43,41 +66,94 @@ export default function Room() {
         const data = await res.json();
         if (data.event) {
           setPlaybackId(data.event.mux_playback_id);
-          setEventStatus(data.event.status);
         }
       } catch { /* demo mode */ }
     }
     loadEvent();
   }, []);
 
-  // Poll sync state every 5s
+  // ─── Auto-start countdown when page loads ───
+  // If event is still "waiting", auto-trigger countdown so the 5-min
+  // timer starts immediately for the icebreaker experience
   useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/sync?event_id=${eventId}`);
-        const data = await res.json();
-        if (data.sync) setSyncState(data.sync);
-        if (data.event_status) setEventStatus(data.event_status);
-        if (data.host_layout) setHostLayout(data.host_layout);
-        if (data.host_visible !== undefined) setHostVisible(data.host_visible);
-        if (data.countdown_start) setCountdownStart(data.countdown_start);
-        if (data.countdown_duration) setCountdownDuration(data.countdown_duration);
-        if (data.curtains_open !== undefined) setCurtainsOpen(data.curtains_open);
-      } catch { /* ignore */ }
-    };
-    poll();
-    const interval = setInterval(poll, 5000);
-    return () => clearInterval(interval);
-  }, [eventId]);
+    if (eventStatus === "waiting" && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: eventId,
+          event_status: "countdown",
+          countdown_duration: DEFAULT_COUNTDOWN,
+        }),
+      }).then(() => poll()).catch(() => {});
+    }
+  }, [eventStatus, eventId, poll]);
 
-  // Mark countdown done when event goes live
+  // ─── Late joiner: skip icebreaker if already live/ended ───
   useEffect(() => {
-    if (eventStatus === "live") {
-      setCountdownDone(true);
+    if (eventStatus === "live" || eventStatus === "ended") {
+      setIcebreakerComplete(true);
     }
   }, [eventStatus]);
 
-  // Check for conversation cards based on playback time
+  // ─── Auto-go-live when icebreaker completes ───
+  const handleIcebreakerComplete = useCallback(() => {
+    setIcebreakerComplete(true);
+
+    // If countdown is still running, the curtains text shows "enjoy the show"
+    // When countdown finishes, auto-go-live triggers below
+    // If countdown already finished, go live now
+    if (countdownStart) {
+      const elapsed = (Date.now() - countdownStart) / 1000;
+      if (elapsed >= countdownDuration) {
+        // Countdown already done, go live immediately
+        fetch("/api/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event_id: eventId, event_status: "live" }),
+        }).then(() => {
+          return fetch("/api/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ event_id: eventId, action: "play" }),
+          });
+        }).then(() => poll()).catch(() => {});
+      }
+    }
+  }, [eventId, countdownStart, countdownDuration, poll]);
+
+  // ─── Auto-go-live when countdown finishes (if icebreaker is done) ───
+  useEffect(() => {
+    if (!countdownStart || !icebreakerComplete || eventStatus === "live" || eventStatus === "ended") return;
+
+    const checkCountdown = () => {
+      const elapsed = (Date.now() - countdownStart) / 1000;
+      if (elapsed >= countdownDuration) {
+        fetch("/api/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event_id: eventId, event_status: "live" }),
+        }).then(() => {
+          return fetch("/api/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ event_id: eventId, action: "play" }),
+          });
+        }).then(() => poll()).catch(() => {});
+        return true;
+      }
+      return false;
+    };
+
+    if (checkCountdown()) return;
+    const interval = setInterval(() => {
+      if (checkCountdown()) clearInterval(interval);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [countdownStart, countdownDuration, icebreakerComplete, eventStatus, eventId, poll]);
+
+  // ─── Check for conversation cards ───
   useEffect(() => {
     async function checkCards() {
       try {
@@ -94,6 +170,20 @@ export default function Room() {
     if (currentTime > 0) checkCards();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [Math.floor(currentTime / 5), eventId]);
+
+  // ─── Host controls keyboard shortcut (backtick) ───
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "`" && !e.ctrlKey && !e.metaKey) {
+        // Don't trigger if user is typing in an input
+        if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
+        e.preventDefault();
+        setHostPanelOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   const handleReaction = useCallback((emoji: ReactionEmoji) => {
     fetch("/api/reactions", {
@@ -117,21 +207,14 @@ export default function Room() {
 
   return (
     <main className="h-screen w-screen flex flex-col overflow-hidden bg-[var(--room-bg)]">
-      {/* Icebreaker Flow (shown first, before the screening) */}
+      {/* Icebreaker + Countdown (unified pre-show) */}
       {!icebreakerComplete && (
         <IcebreakerFlow
           eventId={eventId}
           viewerId={viewerId}
-          onComplete={() => setIcebreakerComplete(true)}
-        />
-      )}
-
-      {/* Pre-Show Countdown (lights dimming, anticipation) */}
-      {icebreakerComplete && eventStatus === "countdown" && countdownStart && !countdownDone && (
-        <PreShowCountdown
           countdownStart={countdownStart}
           countdownDuration={countdownDuration}
-          onComplete={() => setCountdownDone(true)}
+          onComplete={handleIcebreakerComplete}
         />
       )}
 
@@ -142,7 +225,7 @@ export default function Room() {
       <header className="flex items-center justify-between px-5 py-3 flex-shrink-0 bg-[var(--room-bg)] border-b border-[var(--room-border)]">
         <div className="flex items-center gap-3">
           <span className="text-xs tracking-[0.15em] uppercase text-[var(--room-accent)] font-semibold">
-            BTD Screening
+            DOAC Screening
           </span>
           {eventStatus === "live" && (
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
@@ -150,8 +233,11 @@ export default function Room() {
               <span className="text-[11px] text-white/60 font-medium tracking-wider">LIVE</span>
             </div>
           )}
+          {eventStatus === "countdown" && (
+            <span className="text-xs text-[var(--room-gold)]">Pre-show</span>
+          )}
           {eventStatus === "waiting" && (
-            <span className="text-xs text-[var(--room-text-muted)]">Waiting to start</span>
+            <span className="text-xs text-[var(--room-text-muted)]">Starting...</span>
           )}
           {eventStatus === "ended" && (
             <span className="text-xs text-[var(--room-text-muted)]">Ended</span>
@@ -160,12 +246,27 @@ export default function Room() {
         <div className="flex items-center gap-3">
           <PresenceCounter eventId={eventId} />
           <ThemeToggle />
+          {/* Host controls toggle */}
+          <button
+            onClick={() => setHostPanelOpen(!hostPanelOpen)}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+              hostPanelOpen
+                ? "bg-[var(--room-accent)] text-white"
+                : "bg-[var(--room-surface)] text-[var(--room-text-muted)] hover:text-[var(--room-text)]"
+            }`}
+            title="Host Controls (`)"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
         </div>
       </header>
 
       {/* ─── Main Content ─── */}
       <div className="flex flex-1 min-h-0">
-        {/* Video + Reactions (full width, cinema-style) */}
+        {/* Video + Reactions */}
         <div className="flex-1 flex flex-col p-4 min-w-0">
           <div className="relative flex-1 min-h-0">
             <VideoPlayer
@@ -173,16 +274,14 @@ export default function Room() {
               syncState={syncState}
               onTimeUpdate={setCurrentTime}
             />
-            {/* Host PiP overlay */}
             {hostLayout === "pip" && (
               <HostCameraLayer layout="pip" visible={hostVisible} />
             )}
-            {/* Reactions */}
             <ReactionBar onReaction={handleReaction} />
           </div>
         </div>
 
-        {/* Host side panel (only when in side layout) */}
+        {/* Host side panel */}
         {hostLayout === "side" && hostVisible && (
           <div className="w-80 lg:w-96 flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] p-3">
             <HostCameraLayer layout="side" visible={true} />
@@ -190,18 +289,30 @@ export default function Room() {
         )}
       </div>
 
-      {/* ─── Conversation Card Overlay ─── */}
+      {/* Conversation Card Overlay */}
       <ConversationCardOverlay
         card={activeCard}
         onRespond={handleCardRespond}
         onDismiss={handleCardDismiss}
       />
 
-      {/* ─── Chat Panel (slide-in from right) ─── */}
+      {/* Chat Panel */}
       <ChatPanel
         eventId={eventId}
         isOpen={chatOpen}
         onToggle={() => setChatOpen(!chatOpen)}
+      />
+
+      {/* Host Controls Panel (collapsible) */}
+      <HostControlsPanel
+        eventId={eventId}
+        isOpen={hostPanelOpen}
+        onToggle={() => setHostPanelOpen(!hostPanelOpen)}
+        eventStatus={eventStatus}
+        curtainsOpen={curtainsOpen}
+        hostLayout={hostLayout}
+        hostVisible={hostVisible}
+        onSyncUpdate={poll}
       />
     </main>
   );

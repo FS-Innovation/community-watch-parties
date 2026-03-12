@@ -14,8 +14,7 @@ const ICEBREAKER_CARDS = [
   { prompt: "Do you think your younger self would be proud / look up to you now?", author: "Lewis Capaldi", image: "/cards/card-5-lewis-capaldi.jpg" },
 ];
 
-const CARD_DURATION = 120; // 120 seconds per card
-const TOTAL_ICEBREAKER_TIME = ICEBREAKER_CARDS.length * CARD_DURATION; // 10 minutes total
+const CARD_DURATION = 50; // seconds per card (5 cards in ~4 min, leaving ~1 min for matching)
 
 interface IcebreakerResponse {
   prompt: string;
@@ -25,17 +24,19 @@ interface IcebreakerResponse {
 interface Props {
   eventId: string;
   viewerId: string;
+  countdownStart: number | null;
+  countdownDuration: number;
   onComplete: () => void;
 }
 
-export default function IcebreakerFlow({ eventId, viewerId, onComplete }: Props) {
+export default function IcebreakerFlow({ eventId, viewerId, countdownStart, countdownDuration, onComplete }: Props) {
   const [displayName, setDisplayName] = useState("");
   const [nameConfirmed, setNameConfirmed] = useState(false);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [responses, setResponses] = useState<IcebreakerResponse[]>([]);
   const [cardTimeLeft, setCardTimeLeft] = useState(CARD_DURATION);
-  const [globalTimeLeft, setGlobalTimeLeft] = useState(TOTAL_ICEBREAKER_TIME);
+  const [globalTimeLeft, setGlobalTimeLeft] = useState(countdownDuration);
   const [matchLoading, setMatchLoading] = useState(false);
   const [match, setMatch] = useState<{ name: string; answers: string[]; reason: string } | null>(null);
   const [phase, setPhase] = useState<"name" | "cards" | "matching" | "reveal">("name");
@@ -56,31 +57,27 @@ export default function IcebreakerFlow({ eventId, viewerId, onComplete }: Props)
     if (saved) setDisplayName(saved);
   }, []);
 
-  // Global countdown timer (starts when cards phase begins)
+  // Global countdown synced with server countdown
   useEffect(() => {
-    if (phase !== "cards") return;
+    if (!countdownStart) return;
 
-    globalTimerRef.current = setInterval(() => {
-      setGlobalTimeLeft((t) => {
-        if (t <= 1) {
-          if (globalTimerRef.current) clearInterval(globalTimerRef.current);
-          if (cardTimerRef.current) clearInterval(cardTimerRef.current);
-          // Time's up — go straight to matching
-          setTimeout(() => {
-            setPhase("matching");
-            findMatchFromRefs();
-          }, 0);
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
+    const tick = () => {
+      const elapsed = (Date.now() - countdownStart) / 1000;
+      const remaining = Math.max(0, countdownDuration - elapsed);
+      setGlobalTimeLeft(Math.ceil(remaining));
 
-    return () => {
-      if (globalTimerRef.current) clearInterval(globalTimerRef.current);
+      if (remaining <= 0 && phase === "cards") {
+        if (cardTimerRef.current) clearInterval(cardTimerRef.current);
+        setPhase("matching");
+        findMatchFromRefs();
+      }
     };
+
+    tick();
+    const interval = setInterval(tick, 500);
+    return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [countdownStart, countdownDuration, phase]);
 
   // Per-card countdown timer
   useEffect(() => {
@@ -215,8 +212,14 @@ export default function IcebreakerFlow({ eventId, viewerId, onComplete }: Props)
   const progress = ((currentCardIndex) / ICEBREAKER_CARDS.length) * 100;
   const cardProgress = ((CARD_DURATION - cardTimeLeft) / CARD_DURATION) * 100;
 
+  // Lights dimming effect synced with countdown progress
+  const countdownProgress = countdownStart ? Math.min(1, (Date.now() - countdownStart) / (countdownDuration * 1000)) : 0;
+  const bgDarkness = Math.min(0.85, countdownProgress * 0.85);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--room-bg)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{
+      background: `radial-gradient(ellipse at center, rgba(10, 10, 10, ${0.92 + bgDarkness * 0.08}) 0%, rgba(5, 5, 5, ${0.95 + bgDarkness * 0.05}) 100%)`,
+    }}>
       <AnimatePresence mode="wait">
         {/* ─── Name Entry ─── */}
         {phase === "name" && (
@@ -281,7 +284,7 @@ export default function IcebreakerFlow({ eventId, viewerId, onComplete }: Props)
                     strokeWidth="3"
                     strokeLinecap="round"
                     strokeDasharray={`${2 * Math.PI * 42}`}
-                    strokeDashoffset={`${2 * Math.PI * 42 * (1 - globalTimeLeft / TOTAL_ICEBREAKER_TIME)}`}
+                    strokeDashoffset={`${2 * Math.PI * 42 * (1 - globalTimeLeft / countdownDuration)}`}
                     style={{ transition: "stroke-dashoffset 1s linear" }}
                   />
                 </svg>

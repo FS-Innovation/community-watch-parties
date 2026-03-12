@@ -83,16 +83,17 @@ export async function POST(request: NextRequest) {
 
   if (body.event_status) {
     room.event_status = body.event_status;
-    if (body.event_status === "countdown") {
+    if (body.event_status === "countdown" && room.event_status !== "countdown") {
       room.countdown_start = Date.now();
       room.countdown_duration = body.countdown_duration ?? 300;
     }
-    if (body.event_status === "live") {
+    if (body.event_status === "live" && room.event_status !== "live") {
       room.countdown_start = null;
       room.curtains_open = true;
     }
     if (body.event_status === "waiting") {
       room.curtains_open = false;
+      room.countdown_start = null;
     }
   }
 

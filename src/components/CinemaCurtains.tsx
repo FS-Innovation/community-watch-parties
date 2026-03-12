@@ -10,7 +10,7 @@ export default function CinemaCurtains({ isOpen }: Props) {
   return (
     <AnimatePresence>
       {!isOpen && (
-        <div className="fixed inset-0 z-50 pointer-events-none">
+        <div className="fixed inset-0 z-[60] pointer-events-none">
           {/* Left curtain */}
           <motion.div
             initial={{ x: 0 }}
