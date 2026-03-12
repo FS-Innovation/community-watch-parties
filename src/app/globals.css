@@ -267,3 +267,37 @@ html, body {
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   z-index: 20;
 }
+
+/* ─── Cinema Curtains ─── */
+.curtain-panel {
+  background: linear-gradient(180deg, #1a0505 0%, #2d0a0a 30%, #3d1010 60%, #2d0a0a 100%);
+}
+
+.curtain-fabric {
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(80, 15, 15, 0.4) 0px,
+    rgba(60, 10, 10, 0.2) 8px,
+    rgba(80, 15, 15, 0.4) 16px
+  );
+}
+
+.curtain-fold {
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.4));
+}
+
+.curtain-fold-left {
+  background: linear-gradient(270deg, transparent, rgba(0, 0, 0, 0.4));
+}
+
+.curtain-valance {
+  background: linear-gradient(180deg, #1a0505, #2d0a0a);
+  border-bottom: 3px solid rgba(212, 168, 83, 0.3);
+}
+
+/* ─── Chat Panel ─── */
+.chat-panel {
+  background: var(--room-panel);
+  backdrop-filter: blur(24px);
+  border-left: 1px solid var(--room-border);
+}

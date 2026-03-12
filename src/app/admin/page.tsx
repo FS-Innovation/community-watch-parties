@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import type { ConversationCard, QAQuestion } from "@/lib/types";
+import type { ConversationCard } from "@/lib/types";
 
 export default function AdminDashboard() {
   const [eventId] = useState("demo-event");
@@ -20,26 +20,20 @@ export default function AdminDashboard() {
   const [newCardType, setNewCardType] = useState("card");
   const [newCardResponseType, setNewCardResponseType] = useState("text");
 
-  // Q&A
-  const [questions, setQuestions] = useState<QAQuestion[]>([]);
-
   // Load data
   const loadAll = useCallback(async () => {
     try {
-      const [syncRes, presenceRes, qaRes] = await Promise.all([
+      const [syncRes, presenceRes] = await Promise.all([
         fetch(`/api/sync?event_id=${eventId}`),
         fetch(`/api/presence?event_id=${eventId}`),
-        fetch(`/api/qa?event_id=${eventId}`),
       ]);
       const syncData = await syncRes.json();
       const presenceData = await presenceRes.json();
-      const qaData = await qaRes.json();
 
       if (syncData.event_status) setEventStatus(syncData.event_status);
       if (syncData.host_layout) setHostLayout(syncData.host_layout);
       if (syncData.host_visible !== undefined) setHostVisible(syncData.host_visible);
       setViewerCount(presenceData.count || 0);
-      setQuestions(qaData.questions || []);
     } catch { /* ignore */ }
   }, [eventId]);
 
@@ -57,14 +51,6 @@ export default function AdminDashboard() {
       body: JSON.stringify({ event_id: eventId, ...body }),
     });
     loadAll();
-  };
-
-  // ─── Q&A Moderation ───
-  const setQuestionStatus = async (questionId: string, status: string) => {
-    // In production: POST to API to update status
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === questionId ? { ...q, status: status as QAQuestion["status"] } : q))
-    );
   };
 
   return (
@@ -116,6 +102,9 @@ export default function AdminDashboard() {
                     </button>
                   ))}
                 </div>
+                <p className="text-[10px] text-[var(--room-text-muted)] mt-1">
+                  Setting to &quot;live&quot; opens the cinema curtains for all viewers.
+                </p>
               </div>
             </div>
           </div>
@@ -129,13 +118,13 @@ export default function AdminDashboard() {
                 onClick={() => sendSync({ action: "play" })}
                 className="btn-accent text-xs flex items-center gap-1"
               >
-                ▶ Play
+                Play
               </button>
               <button
                 onClick={() => sendSync({ action: "pause" })}
                 className="btn-ghost text-xs flex items-center gap-1"
               >
-                ⏸ Pause
+                Pause
               </button>
             </div>
 
@@ -258,78 +247,11 @@ export default function AdminDashboard() {
                     onClick={() => setCards((prev) => prev.filter((c) => c.id !== card.id))}
                     className="text-[var(--room-text-muted)] hover:text-[var(--room-red)]"
                   >
-                    ×
+                    x
                   </button>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-
-        {/* ─── Q&A Moderation (full width) ─── */}
-        <div className="admin-card mt-6">
-          <h2 className="font-semibold text-sm mb-4 text-[var(--room-accent)]">Q&amp;A Moderation</h2>
-
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {questions.length === 0 && (
-              <p className="text-xs text-[var(--room-text-muted)]">No questions submitted yet.</p>
-            )}
-            {questions
-              .sort((a, b) => b.upvote_count - a.upvote_count)
-              .map((q) => (
-                <div
-                  key={q.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${
-                    q.status === "selected"
-                      ? "border-[var(--room-accent)] bg-[rgba(232,115,74,0.04)]"
-                      : q.status === "hidden"
-                      ? "border-[var(--room-border)] opacity-40"
-                      : "border-[var(--room-border)]"
-                  }`}
-                >
-                  <span className="text-[var(--room-accent)] font-bold min-w-[30px] text-right">
-                    {q.upvote_count}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p>{q.question_text}</p>
-                    <p className="text-xs text-[var(--room-text-muted)] mt-1">— {q.display_name}</p>
-                  </div>
-                  <div className="flex gap-1 flex-shrink-0">
-                    {q.status !== "selected" && (
-                      <button
-                        onClick={() => setQuestionStatus(q.id, "selected")}
-                        className="btn-ghost text-[10px] px-2 py-1"
-                        title="Select to answer live"
-                      >
-                        Select
-                      </button>
-                    )}
-                    {q.status === "selected" && (
-                      <button
-                        onClick={() => setQuestionStatus(q.id, "answered")}
-                        className="btn-accent text-[10px] px-2 py-1"
-                      >
-                        Mark Answered
-                      </button>
-                    )}
-                    {q.status !== "hidden" ? (
-                      <button
-                        onClick={() => setQuestionStatus(q.id, "hidden")}
-                        className="btn-ghost text-[10px] px-2 py-1 hover:text-[var(--room-red)]"
-                      >
-                        Hide
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setQuestionStatus(q.id, "visible")}
-                        className="btn-ghost text-[10px] px-2 py-1"
-                      >
-                        Show
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
           </div>
         </div>
       </div>

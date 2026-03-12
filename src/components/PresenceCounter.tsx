@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { getViewerId } from "@/lib/viewer";
 
 interface Props {
   eventId: string;
@@ -10,14 +11,20 @@ export default function PresenceCounter({ eventId }: Props) {
   const [count, setCount] = useState(0);
   const [bumping, setBumping] = useState(false);
   const prevCountRef = useRef(0);
+  const viewerId = typeof window !== "undefined" ? getViewerId() : "";
 
   useEffect(() => {
-    // In production: use Supabase Realtime Presence
-    // supabase.channel(`presence:${eventId}`).on('presence', { event: 'sync' }, () => { ... })
-    //
-    // For now: poll a simple presence endpoint
-    const poll = async () => {
+    // Send heartbeat and poll count
+    const heartbeatAndPoll = async () => {
       try {
+        // Send heartbeat
+        await fetch("/api/presence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event_id: eventId, viewer_id: viewerId }),
+        });
+
+        // Get count
         const res = await fetch(`/api/presence?event_id=${eventId}`);
         const data = await res.json();
         const newCount = data.count || 0;
@@ -29,10 +36,10 @@ export default function PresenceCounter({ eventId }: Props) {
         setCount(newCount);
       } catch { /* ignore */ }
     };
-    poll();
-    const interval = setInterval(poll, 8000);
+    heartbeatAndPoll();
+    const interval = setInterval(heartbeatAndPoll, 10000);
     return () => clearInterval(interval);
-  }, [eventId]);
+  }, [eventId, viewerId]);
 
   return (
     <div className="presence-badge">

@@ -11,21 +11,19 @@ interface FloatingReaction {
 
 interface Props {
   onReaction: (emoji: ReactionEmoji) => void;
-  incomingReactions: FloatingReaction[];
 }
 
-export default function ReactionBar({ onReaction, incomingReactions }: Props) {
+export default function ReactionBar({ onReaction }: Props) {
   const [lastSentAt, setLastSentAt] = useState(0);
   const [localReactions, setLocalReactions] = useState<FloatingReaction[]>([]);
   const idRef = useRef(0);
 
   const sendReaction = useCallback((emoji: ReactionEmoji) => {
     const now = Date.now();
-    if (now - lastSentAt < 3000) return; // Rate limit: 1 per 3s
+    if (now - lastSentAt < 3000) return;
     setLastSentAt(now);
     onReaction(emoji);
 
-    // Local animation
     const id = idRef.current++;
     const x = 20 + Math.random() * 60;
     setLocalReactions((prev) => [...prev, { id, emoji, x }]);
@@ -34,13 +32,11 @@ export default function ReactionBar({ onReaction, incomingReactions }: Props) {
     }, 2000);
   }, [lastSentAt, onReaction]);
 
-  const allReactions = [...incomingReactions, ...localReactions];
-
   return (
     <>
       {/* Floating reactions over the video */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {allReactions.map((r) => (
+        {localReactions.map((r) => (
           <span
             key={r.id}
             className="floating-reaction"

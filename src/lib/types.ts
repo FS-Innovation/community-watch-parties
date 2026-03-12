@@ -47,21 +47,6 @@ export interface CardResponse {
   responded_at: string;
 }
 
-// ─── Q&A ───
-
-export type QuestionStatus = 'visible' | 'selected' | 'answered' | 'hidden';
-
-export interface QAQuestion {
-  id: string;
-  event_id: string;
-  viewer_id: string;
-  display_name: string;
-  question_text: string;
-  upvote_count: number;
-  status: QuestionStatus;
-  created_at: string;
-}
-
 // ─── Reactions ───
 
 export const REACTIONS = [

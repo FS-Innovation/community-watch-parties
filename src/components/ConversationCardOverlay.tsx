@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { ConversationCard, ReactionEmoji } from "@/lib/types";
+import type { ConversationCard } from "@/lib/types";
 import { REACTIONS } from "@/lib/types";
 
 interface Props {
@@ -16,28 +16,39 @@ export default function ConversationCardOverlay({ card, onRespond, onDismiss, re
   const [response, setResponse] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dismissRef = useRef(onDismiss);
+  dismissRef.current = onDismiss;
 
-  // Auto-dismiss countdown
+  // Auto-dismiss countdown — no setState calls to parent during render
   useEffect(() => {
-    if (!card) { setSubmitted(false); setResponse(""); return; }
-    setTimeLeft(card.auto_dismiss_seconds);
+    if (!card) {
+      setSubmitted(false);
+      setResponse("");
+      return;
+    }
+
+    const duration = card.auto_dismiss_seconds;
+    setTimeLeft(duration);
     setSubmitted(false);
     setResponse("");
 
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
-          clearInterval(timerRef.current!);
-          onDismiss();
+          if (timerRef.current) clearInterval(timerRef.current);
+          // Defer the parent state update to avoid setState-during-render
+          setTimeout(() => dismissRef.current(), 0);
           return 0;
         }
         return t - 1;
       });
     }, 1000);
 
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [card, onDismiss]);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [card]);
 
   const handleSubmit = () => {
     if (!card || !response.trim()) return;
@@ -51,7 +62,7 @@ export default function ConversationCardOverlay({ card, onRespond, onDismiss, re
     setSubmitted(true);
   };
 
-  const isFullScreen = card?.type !== "card"; // quizzes, polls, etc are full-screen
+  const isFullScreen = card?.type !== "card";
 
   return (
     <AnimatePresence>
@@ -67,7 +78,6 @@ export default function ConversationCardOverlay({ card, onRespond, onDismiss, re
           }`}
         >
           <div className={`card-overlay p-6 ${isFullScreen ? "w-full max-w-xl mx-4" : "w-full"}`}>
-            {/* Type badge + timer */}
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] tracking-[0.2em] uppercase text-[var(--room-accent)] font-medium">
                 {card.type === "card" ? "Conversation Card" : card.type === "quiz" ? "Quiz" : card.type === "poll" ? "Poll" : card.type}
@@ -75,12 +85,10 @@ export default function ConversationCardOverlay({ card, onRespond, onDismiss, re
               <span className="text-xs text-[var(--room-text-muted)]">{timeLeft}s</span>
             </div>
 
-            {/* Prompt */}
             <p className="text-lg font-medium mb-4 leading-snug">{card.prompt_text}</p>
 
             {!submitted ? (
               <>
-                {/* Text response */}
                 {card.response_type === "text" && (
                   <div className="flex gap-2">
                     <input
@@ -97,7 +105,6 @@ export default function ConversationCardOverlay({ card, onRespond, onDismiss, re
                   </div>
                 )}
 
-                {/* Emoji choice */}
                 {card.response_type === "emoji_choice" && (
                   <div className="flex gap-3 justify-center">
                     {REACTIONS.map((r) => (
@@ -112,7 +119,6 @@ export default function ConversationCardOverlay({ card, onRespond, onDismiss, re
                   </div>
                 )}
 
-                {/* Multiple choice */}
                 {card.response_type === "multiple_choice" && card.options && (
                   <div className="space-y-2">
                     {card.options.map((option, i) => (
@@ -130,17 +136,13 @@ export default function ConversationCardOverlay({ card, onRespond, onDismiss, re
             ) : (
               <div className="text-center py-2">
                 <p className="text-sm text-[var(--room-green)]">Response submitted</p>
-                {/* Show aggregated results if enabled */}
                 {card.show_results && resultSummary && (
                   <div className="mt-3 space-y-1">
                     {Object.entries(resultSummary).map(([val, count]) => (
                       <div key={val} className="flex items-center gap-2 text-xs">
                         <span className="text-[var(--room-text-secondary)]">{val}</span>
                         <div className="flex-1 h-1 bg-[var(--room-surface)] rounded overflow-hidden">
-                          <div
-                            className="h-full bg-[var(--room-accent)] rounded"
-                            style={{ width: `${Math.min(100, count)}%` }}
-                          />
+                          <div className="h-full bg-[var(--room-accent)] rounded" style={{ width: `${Math.min(100, count)}%` }} />
                         </div>
                         <span className="text-[var(--room-text-muted)]">{count}%</span>
                       </div>
@@ -150,7 +152,6 @@ export default function ConversationCardOverlay({ card, onRespond, onDismiss, re
               </div>
             )}
 
-            {/* Dismiss */}
             <button
               onClick={onDismiss}
               className="text-xs text-[var(--room-text-muted)] hover:text-[var(--room-text)] transition-colors mt-3 block mx-auto"

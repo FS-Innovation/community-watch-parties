@@ -5,30 +5,25 @@ import VideoPlayer from "@/components/VideoPlayer";
 import ReactionBar from "@/components/ReactionBar";
 import HostCameraLayer from "@/components/HostCameraLayer";
 import ConversationCardOverlay from "@/components/ConversationCardOverlay";
-import QAPanel from "@/components/QAPanel";
+import ChatPanel from "@/components/ChatPanel";
+import CinemaCurtains from "@/components/CinemaCurtains";
 import PresenceCounter from "@/components/PresenceCounter";
 import type { SyncState, ConversationCard, HostLayout, ReactionEmoji } from "@/lib/types";
 import { getViewerId } from "@/lib/viewer";
-
-interface FloatingReaction {
-  id: number;
-  emoji: string;
-  x: number;
-}
 
 const DEMO_EVENT_ID = "demo-event";
 
 export default function Room() {
   const [eventId] = useState(DEMO_EVENT_ID);
   const [playbackId, setPlaybackId] = useState<string | null>(null);
-  const [eventStatus, setEventStatus] = useState<string>("live");
+  const [eventStatus, setEventStatus] = useState<string>("waiting");
   const [syncState, setSyncState] = useState<SyncState | null>(null);
   const [activeCard, setActiveCard] = useState<ConversationCard | null>(null);
   const [hostLayout, setHostLayout] = useState<HostLayout>("pip");
   const [hostVisible, setHostVisible] = useState(true);
-  const [incomingReactions, setIncomingReactions] = useState<FloatingReaction[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
-  const reactionIdRef = useRef(0);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [curtainsOpen, setCurtainsOpen] = useState(false);
   const shownCardIds = useRef<Set<string>>(new Set());
 
   const viewerId = typeof window !== "undefined" ? getViewerId() : "";
@@ -64,6 +59,13 @@ export default function Room() {
     const interval = setInterval(poll, 5000);
     return () => clearInterval(interval);
   }, [eventId]);
+
+  // Open curtains when event goes live
+  useEffect(() => {
+    if (eventStatus === "live" && !curtainsOpen) {
+      setCurtainsOpen(true);
+    }
+  }, [eventStatus, curtainsOpen]);
 
   // Check for conversation cards based on playback time
   useEffect(() => {
@@ -103,49 +105,11 @@ export default function Room() {
     setActiveCard(null);
   }, []);
 
-  // Simulate incoming reactions from other viewers (demo)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (eventStatus !== "live") return;
-      if (Math.random() < 0.3) {
-        const emojis = ["🔥", "❤️", "🤯", "😂", "👏"];
-        const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-        const id = reactionIdRef.current++;
-        const x = 10 + Math.random() * 80;
-        setIncomingReactions((prev) => [...prev, { id, emoji, x }]);
-        setTimeout(() => {
-          setIncomingReactions((prev) => prev.filter((r) => r.id !== id));
-        }, 2000);
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [eventStatus]);
-
-  // Demo: trigger a conversation card preview after 8 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!activeCard) {
-        setActiveCard({
-          id: "preview-card",
-          event_id: DEMO_EVENT_ID,
-          type: "card",
-          trigger_time_seconds: 0,
-          prompt_text: "What moment in this episode resonated with you most?",
-          options: null,
-          response_type: "text",
-          auto_dismiss_seconds: 30,
-          show_results: false,
-          is_active: true,
-          sort_order: 0,
-        });
-      }
-    }, 8000);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
-    <main className="h-screen w-screen flex flex-col overflow-hidden">
+    <main className="h-screen w-screen flex flex-col overflow-hidden bg-[var(--room-bg)]">
+      {/* Cinema Curtains */}
+      <CinemaCurtains isOpen={curtainsOpen} />
+
       {/* ─── Top Bar ─── */}
       <header className="flex items-center justify-between px-5 py-3 flex-shrink-0 bg-[var(--room-bg)] border-b border-[var(--room-border)]">
         <div className="flex items-center gap-3">
@@ -164,16 +128,13 @@ export default function Room() {
           {eventStatus === "ended" && (
             <span className="text-xs text-[var(--room-text-muted)]">Ended</span>
           )}
-          <span className="text-[10px] text-[var(--room-text-muted)] border border-[var(--room-border)] rounded px-2 py-0.5">
-            Viewer Preview
-          </span>
         </div>
         <PresenceCounter eventId={eventId} />
       </header>
 
       {/* ─── Main Content ─── */}
       <div className="flex flex-1 min-h-0">
-        {/* Left: Video + Reactions (~70-75%) */}
+        {/* Video + Reactions (full width, cinema-style) */}
         <div className="flex-1 flex flex-col p-4 min-w-0">
           <div className="relative flex-1 min-h-0">
             <VideoPlayer
@@ -185,27 +146,17 @@ export default function Room() {
             {hostLayout === "pip" && (
               <HostCameraLayer layout="pip" visible={hostVisible} />
             )}
-            {/* Floating reactions */}
-            <ReactionBar
-              onReaction={handleReaction}
-              incomingReactions={incomingReactions}
-            />
+            {/* Reactions */}
+            <ReactionBar onReaction={handleReaction} />
           </div>
         </div>
 
-        {/* Right: Host side panel + Q&A (~25-30%) */}
-        <div className="w-80 lg:w-96 flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)]">
-          {/* Host camera in side panel mode */}
-          {hostLayout === "side" && hostVisible && (
-            <div className="p-3 border-b border-[var(--room-border)]">
-              <HostCameraLayer layout="side" visible={true} />
-            </div>
-          )}
-          {/* Q&A Panel */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <QAPanel eventId={eventId} />
+        {/* Host side panel (only when in side layout) */}
+        {hostLayout === "side" && hostVisible && (
+          <div className="w-80 lg:w-96 flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] p-3">
+            <HostCameraLayer layout="side" visible={true} />
           </div>
-        </div>
+        )}
       </div>
 
       {/* ─── Conversation Card Overlay ─── */}
@@ -213,6 +164,13 @@ export default function Room() {
         card={activeCard}
         onRespond={handleCardRespond}
         onDismiss={handleCardDismiss}
+      />
+
+      {/* ─── Chat Panel (slide-in from right) ─── */}
+      <ChatPanel
+        eventId={eventId}
+        isOpen={chatOpen}
+        onToggle={() => setChatOpen(!chatOpen)}
       />
     </main>
   );
