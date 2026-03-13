@@ -367,55 +367,21 @@ export default function Room() {
       </header>
 
       {/* ─── Main Content ─── */}
-      <div className="flex flex-col flex-1 min-h-0">
-        {!segmentComplete ? (
-          /* ─── Pre-show: Phase-driven experience ─── */
-          <div className="flex flex-1 min-h-0">
-            {/* Center: phase-driven pre-show (arrival → cards → build → silence → curtain) */}
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <PreShowExperience
-                eventId={eventId}
-                viewerId={viewerId}
-                countdownStart={countdownStart}
-                countdownDuration={countdownDuration}
-                onComplete={handleSegmentComplete}
-                onCardChange={handleCardPromptChange}
-                onPhaseChange={handlePhaseChange}
-              />
-            </div>
-            {/* Right: Chat (always available) */}
-            <AnimatePresence>
-              {chatOpen && (
-                <motion.div
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 384, opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }}
-                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                  className="flex-shrink-0 border-l border-white/[0.06] flex flex-col overflow-hidden relative z-10"
-                  style={{ height: "100%" }}
-                >
-                  <ChatPanel
-                    eventId={eventId}
-                    isOpen={true}
-                    onToggle={() => setChatOpen(false)}
-                    inline
-                    cardPrompt={currentCardPrompt}
-                    cardImage={currentCardImage}
-                    cardAuthor={currentCardAuthor}
-                    cardIndex={currentCardIndex}
-                    totalCards={totalCards}
-                    cardTimeLeft={cardTimeLeft}
-                    phase={preshowPhase}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        ) : (
-          /* ─── Screening Room: Video (mother screen) + Segment Chat ─── */
-          <div className="flex flex-1 min-h-0">
-            {/* Left: Video + reactions */}
-            <div className="flex-1 min-w-0 flex flex-col p-4">
+      <div className="flex flex-1 min-h-0">
+        {/* Left: Cinema / Pre-show area (dark) */}
+        <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+          {!segmentComplete ? (
+            <PreShowExperience
+              eventId={eventId}
+              viewerId={viewerId}
+              countdownStart={countdownStart}
+              countdownDuration={countdownDuration}
+              onComplete={handleSegmentComplete}
+              onCardChange={handleCardPromptChange}
+              onPhaseChange={handlePhaseChange}
+            />
+          ) : (
+            <div className="flex flex-col h-full p-4">
               <div className="relative flex-1">
                 <VideoPlayer
                   playbackId={playbackId}
@@ -425,26 +391,36 @@ export default function Room() {
                 <ReactionBar onReaction={handleReaction} />
               </div>
             </div>
+          )}
+        </div>
 
-            {/* Right: Segment-based chat room */}
-            <AnimatePresence>
-              {chatOpen && (
-                <motion.div
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 384, opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }}
-                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden relative z-10"
-                  style={{ height: "100%" }}
-                >
-                  <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Host side panel — reserved for Q&A phase (not during live screening) */}
-          </div>
-        )}
+        {/* Right: Chat panel — OUTSIDE the cinema, always bright */}
+        <AnimatePresence>
+          {chatOpen && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 384, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="flex-shrink-0 flex flex-col overflow-hidden relative z-10"
+              style={{ height: "100%" }}
+            >
+              <ChatPanel
+                eventId={eventId}
+                isOpen={true}
+                onToggle={() => setChatOpen(false)}
+                inline
+                cardPrompt={currentCardPrompt}
+                cardImage={currentCardImage}
+                cardAuthor={currentCardAuthor}
+                cardIndex={currentCardIndex}
+                totalCards={totalCards}
+                cardTimeLeft={cardTimeLeft}
+                phase={preshowPhase}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Conversation Card Overlay (legacy server-triggered cards) */}

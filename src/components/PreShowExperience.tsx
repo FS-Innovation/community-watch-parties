@@ -159,34 +159,13 @@ export default function PreShowExperience({
                   </button>
                 </motion.div>
 
-                {/* Countdown pill */}
-                {countdownStart && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1.2 }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)] mx-auto w-fit"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
-                    <span className="text-sm font-mono font-medium text-[var(--room-text)]">{formatTime(timeLeft)}</span>
-                    <span className="text-[10px] text-[var(--room-text-muted)] tracking-wider uppercase">until screening</span>
-                  </motion.div>
-                )}
               </div>
             )}
 
-            {/* ─── Cards Phase (warmup or skipped arrival) — card image moved to chat panel ─── */}
+            {/* ─── Cards Phase (warmup or skipped arrival) — card shown in chat panel ─── */}
             {showCards && (
-              <div className="flex flex-col items-center justify-center h-full">
-                {/* Countdown pill */}
-                {countdownStart && timeLeft > 0 && (
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
-                    <span className="text-sm font-mono font-medium text-[var(--room-text)]">{formatTime(timeLeft)}</span>
-                    <span className="text-[10px] text-[var(--room-text-muted)] tracking-wider uppercase">until screening</span>
-                  </div>
-                )}
-                {/* ScreeningCards still runs (hidden) to drive the timer + card change callbacks */}
+              <div className="flex items-center justify-center h-full">
+                {/* ScreeningCards runs hidden to drive timer + card change callbacks */}
                 <div className="hidden">
                   <ScreeningCards
                     eventId={eventId}
