@@ -121,7 +121,8 @@ export default function ChatPanel({
         {/* Room name header */}
         {roomName && (
           <div className="flex-shrink-0 px-4 pt-4 pb-2">
-            <h2 className="text-sm font-semibold text-white/90">{roomName}</h2>
+            <p className="text-[10px] tracking-[0.15em] uppercase text-white/35">You&rsquo;re part of</p>
+            <h2 className="text-sm font-semibold text-white/90 mt-0.5">{roomName}</h2>
           </div>
         )}
 
