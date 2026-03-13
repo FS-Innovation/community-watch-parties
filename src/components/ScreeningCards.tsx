@@ -211,13 +211,12 @@ export default function ScreeningCards({ eventId, viewerId, room = "builder", on
         </div>
       </div>
 
-      {/* Skip link — subtle, timer handles auto-advance */}
-      <button
-        onClick={advanceCard}
-        className="mt-4 text-[10px] text-[var(--room-text-muted)] hover:text-[var(--room-text)] transition-colors tracking-wider uppercase"
-      >
-        Next card
-      </button>
+      {/* Next card countdown — not clickable, auto-advances */}
+      {currentCardIndex < SCREENING_CARDS.length - 1 && (
+        <p className="mt-4 text-[10px] text-[var(--room-text-muted)] tracking-wider uppercase">
+          Next card in {formatTime(timeLeft)}
+        </p>
+      )}
     </div>
   );
 }
