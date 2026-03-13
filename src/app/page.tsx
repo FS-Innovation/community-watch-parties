@@ -9,6 +9,7 @@ import ConversationCardOverlay from "@/components/ConversationCardOverlay";
 import ChatPanel from "@/components/ChatPanel";
 import CinemaCurtains from "@/components/CinemaCurtains";
 import IcebreakerFlow from "@/components/IcebreakerFlow";
+import ScreeningCards from "@/components/ScreeningCards";
 import PresenceCounter from "@/components/PresenceCounter";
 import ThemeToggle from "@/components/ThemeToggle";
 import HostControlsPanel from "@/components/HostControlsPanel";
@@ -32,7 +33,7 @@ export default function Room() {
   const [icebreakerComplete, setIcebreakerComplete] = useState(false);
   const [countdownStart, setCountdownStart] = useState<number | null>(null);
   const [countdownDuration, setCountdownDuration] = useState(DEFAULT_COUNTDOWN);
-  const [hostPanelOpen, setHostPanelOpen] = useState(false);
+  const [hostPanelOpen, setHostPanelOpen] = useState(true); // Everyone is a host for now
   const [arrived, setArrived] = useState(false); // tracks curtain reveal
   const shownCardIds = useRef<Set<string>>(new Set());
   const autoStartedRef = useRef(false);
@@ -249,7 +250,7 @@ export default function Room() {
       <header className="flex items-center justify-between px-5 py-3 flex-shrink-0 bg-[var(--room-bg)] border-b border-[var(--room-border)] z-[40]">
         <div className="flex items-center gap-3">
           <span className="text-xs tracking-[0.15em] uppercase text-[var(--room-accent)] font-semibold">
-            DOAC Screening
+            FlightStory
           </span>
           {eventStatus === "live" && (
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
@@ -270,6 +271,22 @@ export default function Room() {
         <div className="flex items-center gap-3">
           <PresenceCounter eventId={eventId} />
           <ThemeToggle />
+          {/* Camera toggle — everyone can go on stage */}
+          {icebreakerComplete && (
+            <button
+              onClick={() => setHostVisible(!hostVisible)}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                hostVisible
+                  ? "bg-[var(--room-green)] text-white"
+                  : "bg-[var(--room-surface)] text-[var(--room-text-muted)] hover:text-[var(--room-text)]"
+              }`}
+              title={hostVisible ? "Turn off camera" : "Go on stage"}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => setChatOpen(!chatOpen)}
             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
@@ -302,11 +319,11 @@ export default function Room() {
       </header>
 
       {/* ─── Main Content ─── */}
-      <div className="flex flex-1 min-h-0">
-        {/* Center stage: pre-show icebreaker OR video */}
-        <div className="flex-1 flex flex-col min-w-0 relative">
-          {!icebreakerComplete ? (
-            /* ─── Pre-show: Icebreaker in center ─── */
+      <div className="flex flex-col flex-1 min-h-0">
+        {!icebreakerComplete ? (
+          /* ─── Pre-show: Community Segmentation ─── */
+          <div className="flex flex-1 min-h-0">
+            {/* Center: segmentation flow */}
             <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
               <IcebreakerFlow
                 eventId={eventId}
@@ -316,10 +333,27 @@ export default function Room() {
                 onComplete={handleIcebreakerComplete}
               />
             </div>
-          ) : (
-            /* ─── Live: Video + Reactions ─── */
-            <div className="flex-1 flex flex-col p-4 min-w-0">
-              <div className="relative flex-1 min-h-0">
+            {/* Right: Chat (always available) */}
+            <AnimatePresence>
+              {chatOpen && (
+                <motion.div
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: 384, opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden"
+                >
+                  <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ) : (
+          /* ─── Screening Room: Video top, Cards left + Chat right below ─── */
+          <>
+            {/* Video area */}
+            <div className="flex-shrink-0 p-4 pb-0">
+              <div className="relative">
                 <VideoPlayer
                   playbackId={playbackId}
                   syncState={syncState}
@@ -331,38 +365,44 @@ export default function Room() {
                 <ReactionBar onReaction={handleReaction} />
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Right side: Chat panel (always-available side panel) */}
-        <AnimatePresence>
-          {chatOpen && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 384, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden"
-            >
-              <ChatPanel
-                eventId={eventId}
-                isOpen={true}
-                onToggle={() => setChatOpen(false)}
-                inline
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+            {/* Below video: Cards (left) + Chat (right) */}
+            <div className="flex flex-1 min-h-0">
+              {/* Left: Conversation Cards */}
+              <div className="flex-1 min-w-0 border-r border-[var(--room-border)]">
+                <ScreeningCards
+                  eventId={eventId}
+                  viewerId={viewerId}
+                />
+              </div>
 
-        {/* Host side panel (when in side layout mode during live) */}
-        {hostLayout === "side" && hostVisible && icebreakerComplete && (
-          <div className="w-80 lg:w-96 flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] p-3">
-            <HostCameraLayer layout="side" visible={true} />
-          </div>
+              {/* Right: Chat */}
+              <AnimatePresence>
+                {chatOpen && (
+                  <motion.div
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 384, opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                    className="flex-shrink-0 flex flex-col bg-[var(--room-bg)] overflow-hidden"
+                  >
+                    <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Host side panel */}
+              {hostLayout === "side" && hostVisible && (
+                <div className="w-80 lg:w-96 flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] p-3">
+                  <HostCameraLayer layout="side" visible={true} />
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Conversation Card Overlay */}
+      {/* Conversation Card Overlay (legacy server-triggered cards) */}
       <ConversationCardOverlay
         card={activeCard}
         onRespond={handleCardRespond}

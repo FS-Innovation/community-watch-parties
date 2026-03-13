@@ -91,9 +91,9 @@ export default function VideoPlayer({ playbackId, syncState, onTimeUpdate }: Pro
         muted={false}
         // Mux Data: engagement & viewer experience tracking
         metadata={{
-          video_title: "DOAC Watch Party Screening",
+          video_title: "FlightStory Community Screening",
           viewer_user_id: typeof window !== "undefined" ? localStorage.getItem("viewer_id") || undefined : undefined,
-          video_series: "The Diary of a CEO",
+          video_series: "FlightStory Screenings",
         }}
         // Env key for Mux Data (set via environment variable)
         envKey={process.env.NEXT_PUBLIC_MUX_ENV_KEY}

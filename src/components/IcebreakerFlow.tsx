@@ -5,22 +5,45 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getViewerName, setViewerName } from "@/lib/viewer";
 import gsap from "gsap";
 
-// DOAC Conversation Cards deck
-// Place card images at public/cards/ with the filenames below
-const ICEBREAKER_CARDS = [
-  { prompt: "When was the last time a day flew by and what were you doing?", author: "Payal Kadakia", image: "/cards/card-1-payal-kadakia.jpg" },
-  { prompt: "What did you learn from your greatest failure?", author: "Sir Richard Branson", image: "/cards/card-2-richard-branson.jpg" },
-  { prompt: "What are you clear about now that one year ago you didn't know?", author: "Chris Voss", image: "/cards/card-3-chris-voss.jpg" },
-  { prompt: "When was the last time you changed your mind about something life-changing?", author: "Africa Brooke", image: "/cards/card-4-africa-brooke.jpg" },
-  { prompt: "Do you think your younger self would be proud / look up to you now?", author: "Lewis Capaldi", image: "/cards/card-5-lewis-capaldi.jpg" },
+// Community segmentation questions — chatbot-style flow
+// These gather motivation, intent, segment, and routing preferences
+const SEGMENTATION_QUESTIONS = [
+  {
+    id: "motivation",
+    question: "What made you want to join the community screening tonight?",
+    placeholder: "I'm here because...",
+    signal: "motivation + intent",
+  },
+  {
+    id: "desired_outcome",
+    question: "What would make this worth your time tonight?",
+    placeholder: "I'd love it if...",
+    signal: "desired outcome",
+  },
+  {
+    id: "segment",
+    question: "Which kind of room feels most like you right now?",
+    type: "multi-select" as const,
+    options: [
+      { label: "Reflection", emoji: "🪞", description: "Meaning-seekers who go deep" },
+      { label: "Building", emoji: "🔨", description: "Builders creating something new" },
+      { label: "Creativity", emoji: "🎨", description: "Creatives exploring ideas" },
+      { label: "Connection", emoji: "🤝", description: "Connectors who bring people together" },
+    ],
+    signal: "community segment",
+  },
+  {
+    id: "routing",
+    question: "Would you want to meet people near you, people like you, or just stay in the global screening experience for now?",
+    type: "single-select" as const,
+    options: [
+      { label: "People near me", emoji: "📍", description: "Local to your city" },
+      { label: "People like me", emoji: "✨", description: "Similar interests & segment" },
+      { label: "Global room", emoji: "🌍", description: "Stay in the main experience" },
+    ],
+    signal: "routing preference",
+  },
 ];
-
-const CARD_DURATION = 50; // seconds per card (5 cards in ~4 min, leaving ~1 min for matching)
-
-interface IcebreakerResponse {
-  prompt: string;
-  answer: string;
-}
 
 interface Props {
   eventId: string;
@@ -30,32 +53,20 @@ interface Props {
   onComplete: () => void;
 }
 
+interface SegmentResponse {
+  questionId: string;
+  answer: string | string[];
+}
+
 export default function IcebreakerFlow({ eventId, viewerId, countdownStart, countdownDuration, onComplete }: Props) {
   const [displayName, setDisplayName] = useState("");
-  const [nameConfirmed, setNameConfirmed] = useState(false);
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
-  const [answer, setAnswer] = useState("");
-  const [responses, setResponses] = useState<IcebreakerResponse[]>([]);
-  const [cardTimeLeft, setCardTimeLeft] = useState(CARD_DURATION);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [textAnswer, setTextAnswer] = useState("");
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [responses, setResponses] = useState<SegmentResponse[]>([]);
   const [globalTimeLeft, setGlobalTimeLeft] = useState(countdownDuration);
-  const [matchLoading, setMatchLoading] = useState(false);
-  const [match, setMatch] = useState<{ name: string; answers: string[]; reason: string } | null>(null);
-  const [phase, setPhase] = useState<"name" | "cards" | "matching" | "reveal">("name");
-  const cardTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const globalTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const responsesRef = useRef<IcebreakerResponse[]>([]);
-  const cardIndexRef = useRef(0);
-  const answerRef = useRef("");
-
-  // GSAP refs
-  const cardContainerRef = useRef<HTMLDivElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const prevCardIndex = useRef(-1);
-
-  // Keep refs in sync
-  useEffect(() => { responsesRef.current = responses; }, [responses]);
-  useEffect(() => { cardIndexRef.current = currentCardIndex; }, [currentCardIndex]);
-  useEffect(() => { answerRef.current = answer; }, [answer]);
+  const [phase, setPhase] = useState<"name" | "questions" | "processing" | "ready">("name");
+  const stepRef = useRef<HTMLDivElement>(null);
 
   // Load saved name
   useEffect(() => {
@@ -63,299 +74,139 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
     if (saved) setDisplayName(saved);
   }, []);
 
-  // ─── GSAP card entrance animation ───
-  useEffect(() => {
-    if (phase !== "cards" || !cardRef.current) return;
-
-    const direction = prevCardIndex.current < currentCardIndex ? 1 : -1;
-    prevCardIndex.current = currentCardIndex;
-
-    const el = cardRef.current;
-    const tl = gsap.timeline();
-
-    tl.fromTo(el, {
-      opacity: 0,
-      x: direction * 120,
-      rotateY: direction * 15,
-      scale: 0.92,
-      transformPerspective: 1200,
-    }, {
-      opacity: 1,
-      x: 0,
-      rotateY: 0,
-      scale: 1,
-      duration: 0.7,
-      ease: "power3.out",
-    });
-
-    // Stagger the inner elements for parallax feel
-    const image = el.querySelector(".card-image");
-    const prompt = el.querySelector(".card-prompt-text");
-    const inputArea = el.querySelector(".card-input-area");
-
-    if (image) {
-      tl.fromTo(image, {
-        y: 20,
-        opacity: 0,
-        scale: 1.05,
-      }, {
-        y: 0,
-        opacity: 1,
-        scale: 1,
-        duration: 0.5,
-        ease: "power2.out",
-      }, "-=0.5");
-    }
-
-    if (prompt) {
-      tl.fromTo(prompt, {
-        y: 15,
-        opacity: 0,
-      }, {
-        y: 0,
-        opacity: 1,
-        duration: 0.4,
-        ease: "power2.out",
-      }, "-=0.35");
-    }
-
-    if (inputArea) {
-      tl.fromTo(inputArea, {
-        y: 10,
-        opacity: 0,
-      }, {
-        y: 0,
-        opacity: 1,
-        duration: 0.35,
-        ease: "power2.out",
-      }, "-=0.25");
-    }
-
-    return () => { tl.kill(); };
-  }, [phase, currentCardIndex]);
-
-  // ─── 3D tilt on mouse move ───
-  useEffect(() => {
-    if (phase !== "cards" || !cardRef.current) return;
-
-    const el = cardRef.current;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = el.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-
-      gsap.to(el, {
-        rotateY: x * 8,
-        rotateX: -y * 5,
-        transformPerspective: 1200,
-        duration: 0.4,
-        ease: "power2.out",
-      });
-
-      // Parallax inner image shift
-      const image = el.querySelector(".card-image") as HTMLElement;
-      if (image) {
-        gsap.to(image, {
-          x: x * -12,
-          y: y * -8,
-          duration: 0.4,
-          ease: "power2.out",
-        });
-      }
-    };
-
-    const handleMouseLeave = () => {
-      gsap.to(el, {
-        rotateY: 0,
-        rotateX: 0,
-        duration: 0.6,
-        ease: "power3.out",
-      });
-      const image = el.querySelector(".card-image") as HTMLElement;
-      if (image) {
-        gsap.to(image, { x: 0, y: 0, duration: 0.6, ease: "power3.out" });
-      }
-    };
-
-    el.addEventListener("mousemove", handleMouseMove);
-    el.addEventListener("mouseleave", handleMouseLeave);
-
-    return () => {
-      el.removeEventListener("mousemove", handleMouseMove);
-      el.removeEventListener("mouseleave", handleMouseLeave);
-    };
-  }, [phase, currentCardIndex]);
-
-  // Global countdown synced with server countdown
+  // Global countdown synced with server
   useEffect(() => {
     if (!countdownStart) return;
-
     const tick = () => {
       const elapsed = (Date.now() - countdownStart) / 1000;
       const remaining = Math.max(0, countdownDuration - elapsed);
       setGlobalTimeLeft(Math.ceil(remaining));
-
-      if (remaining <= 0 && phase === "cards") {
-        if (cardTimerRef.current) clearInterval(cardTimerRef.current);
-        setPhase("matching");
-        findMatchFromRefs();
-      }
     };
-
     tick();
     const interval = setInterval(tick, 500);
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countdownStart, countdownDuration, phase]);
+  }, [countdownStart, countdownDuration]);
 
-  // Per-card countdown timer
+  // GSAP entrance for each step
   useEffect(() => {
-    if (phase !== "cards") return;
-
-    setCardTimeLeft(CARD_DURATION);
-    cardTimerRef.current = setInterval(() => {
-      setCardTimeLeft((t) => {
-        if (t <= 1) {
-          if (cardTimerRef.current) clearInterval(cardTimerRef.current);
-          setTimeout(() => advanceCard(), 0);
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (cardTimerRef.current) clearInterval(cardTimerRef.current);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentCardIndex]);
+    if (phase !== "questions" || !stepRef.current) return;
+    const el = stepRef.current;
+    gsap.fromTo(el, {
+      opacity: 0,
+      y: 30,
+      scale: 0.97,
+    }, {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      duration: 0.5,
+      ease: "power3.out",
+    });
+  }, [phase, currentStep]);
 
   const confirmName = () => {
     if (!displayName.trim()) return;
     setViewerName(displayName.trim());
-    setNameConfirmed(true);
-    setPhase("cards");
+    setPhase("questions");
   };
 
-  const findMatchFromRefs = () => {
-    const allResponses = responsesRef.current;
-    findMatch(allResponses.length > 0 ? allResponses : [{ prompt: ICEBREAKER_CARDS[0].prompt, answer: "(no responses)" }]);
-  };
-
-  const submitAnswer = useCallback(() => {
-    if (!answer.trim()) return;
-    const card = ICEBREAKER_CARDS[currentCardIndex];
-    const newResponses = [...responses, { prompt: card.prompt, answer: answer.trim() }];
+  const submitTextAnswer = () => {
+    if (!textAnswer.trim()) return;
+    const q = SEGMENTATION_QUESTIONS[currentStep];
+    const newResponses = [...responses, { questionId: q.id, answer: textAnswer.trim() }];
     setResponses(newResponses);
-    setAnswer("");
+    setTextAnswer("");
 
-    // GSAP exit animation before advancing
-    if (cardRef.current) {
-      gsap.to(cardRef.current, {
-        opacity: 0,
-        x: -80,
-        rotateY: -10,
-        scale: 0.95,
-        transformPerspective: 1200,
-        duration: 0.35,
-        ease: "power2.in",
-        onComplete: () => {
-          // Send to server
-          fetch("/api/icebreaker", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              event_id: eventId,
-              viewer_id: viewerId,
-              display_name: displayName,
-              prompt: card.prompt,
-              answer: answer.trim(),
-            }),
-          }).catch(() => {});
+    // Send to server
+    fetch("/api/icebreaker", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_id: eventId,
+        viewer_id: viewerId,
+        display_name: displayName,
+        prompt: q.question,
+        answer: textAnswer.trim(),
+        signal_type: q.signal,
+      }),
+    }).catch(() => {});
 
-          advanceCardWithResponses(newResponses);
-        },
-      });
-    } else {
-      fetch("/api/icebreaker", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event_id: eventId,
-          viewer_id: viewerId,
-          display_name: displayName,
-          prompt: card.prompt,
-          answer: answer.trim(),
-        }),
-      }).catch(() => {});
-      advanceCardWithResponses(newResponses);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answer, currentCardIndex, responses, eventId, viewerId, displayName]);
-
-  const advanceCard = () => {
-    const currentAnswer = answerRef.current;
-    const card = ICEBREAKER_CARDS[cardIndexRef.current];
-    let newResponses = responsesRef.current;
-
-    if (currentAnswer.trim()) {
-      newResponses = [...newResponses, { prompt: card.prompt, answer: currentAnswer.trim() }];
-      setResponses(newResponses);
-
-      fetch("/api/icebreaker", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event_id: eventId,
-          viewer_id: viewerId,
-          display_name: displayName,
-          prompt: card.prompt,
-          answer: currentAnswer.trim(),
-        }),
-      }).catch(() => {});
-    }
-
-    setAnswer("");
-    advanceCardWithResponses(newResponses);
+    advanceStep(newResponses);
   };
 
-  const advanceCardWithResponses = (currentResponses: IcebreakerResponse[]) => {
-    if (currentCardIndex < ICEBREAKER_CARDS.length - 1) {
-      setCurrentCardIndex((i) => i + 1);
-    } else {
-      // All cards done
-      if (cardTimerRef.current) clearInterval(cardTimerRef.current);
-      if (globalTimerRef.current) clearInterval(globalTimerRef.current);
-      setPhase("matching");
-      findMatch(currentResponses);
-    }
+  const submitOptionAnswer = () => {
+    if (selectedOptions.length === 0) return;
+    const q = SEGMENTATION_QUESTIONS[currentStep];
+    const newResponses = [...responses, { questionId: q.id, answer: selectedOptions }];
+    setResponses(newResponses);
+
+    fetch("/api/icebreaker", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_id: eventId,
+        viewer_id: viewerId,
+        display_name: displayName,
+        prompt: q.question,
+        answer: selectedOptions.join(", "),
+        signal_type: q.signal,
+      }),
+    }).catch(() => {});
+
+    setSelectedOptions([]);
+    advanceStep(newResponses);
   };
 
-  const findMatch = async (allResponses: IcebreakerResponse[]) => {
-    setMatchLoading(true);
-    try {
-      const res = await fetch("/api/matchmaking", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event_id: eventId,
-          viewer_id: viewerId,
-          display_name: displayName,
-          responses: allResponses,
-        }),
-      });
-      const data = await res.json();
-      if (data.match) {
-        setMatch(data.match);
-        setPhase("reveal");
+  const advanceStep = (allResponses: SegmentResponse[]) => {
+    if (currentStep < SEGMENTATION_QUESTIONS.length - 1) {
+      // Animate out, then advance
+      if (stepRef.current) {
+        gsap.to(stepRef.current, {
+          opacity: 0,
+          y: -20,
+          duration: 0.25,
+          ease: "power2.in",
+          onComplete: () => setCurrentStep((i) => i + 1),
+        });
       } else {
-        onComplete();
+        setCurrentStep((i) => i + 1);
       }
-    } catch {
-      onComplete();
-    } finally {
-      setMatchLoading(false);
+    } else {
+      // All done — process and send to AI matchmaking
+      setPhase("processing");
+      processSegmentation(allResponses);
+    }
+  };
+
+  const processSegmentation = async (allResponses: SegmentResponse[]) => {
+    try {
+      await fetch("/api/matchmaking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: eventId,
+          viewer_id: viewerId,
+          display_name: displayName,
+          responses: allResponses.map(r => ({
+            prompt: SEGMENTATION_QUESTIONS.find(q => q.id === r.questionId)?.question || "",
+            answer: Array.isArray(r.answer) ? r.answer.join(", ") : r.answer,
+          })),
+        }),
+      });
+    } catch { /* continue anyway */ }
+
+    // Brief pause then show ready state
+    setTimeout(() => setPhase("ready"), 1500);
+  };
+
+  const toggleOption = (label: string) => {
+    const q = SEGMENTATION_QUESTIONS[currentStep];
+    if (q.type === "single-select") {
+      setSelectedOptions([label]);
+    } else {
+      setSelectedOptions(prev =>
+        prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+      );
     }
   };
 
@@ -365,16 +216,19 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const card = ICEBREAKER_CARDS[currentCardIndex];
-  const progress = ((currentCardIndex) / ICEBREAKER_CARDS.length) * 100;
-  const cardProgress = ((CARD_DURATION - cardTimeLeft) / CARD_DURATION) * 100;
-
-  // Lights dimming effect synced with countdown progress
-  const countdownProgress = countdownStart ? Math.min(1, (Date.now() - countdownStart) / (countdownDuration * 1000)) : 0;
-  const bgDarkness = Math.min(0.85, countdownProgress * 0.85);
+  const currentQuestion = SEGMENTATION_QUESTIONS[currentStep];
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center" style={{ perspective: "1200px" }}>
+    <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center px-4">
+      {/* Countdown pill */}
+      {countdownStart && (
+        <div className="mb-6 flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
+          <span className="text-sm font-mono font-medium text-[var(--room-text)]">{formatTime(globalTimeLeft)}</span>
+          <span className="text-[10px] text-[var(--room-text-muted)] tracking-wider uppercase">until screening</span>
+        </div>
+      )}
+
       <AnimatePresence mode="wait">
         {/* ─── Name Entry ─── */}
         {phase === "name" && (
@@ -383,14 +237,14 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="text-center max-w-md mx-4"
+            className="text-center w-full max-w-md"
           >
             <p className="text-[10px] tracking-[0.3em] uppercase text-[var(--room-gold)] font-medium mb-6">
-              The Diary of a CEO
+              FlightStory Screenings
             </p>
             <h1 className="text-2xl font-bold mb-2">Welcome to the Screening</h1>
             <p className="text-sm text-[var(--room-text-secondary)] mb-8">
-              Before the show begins, you&apos;ll answer a few conversation cards. We&apos;ll use AI to match you with a like-minded viewer to watch with.
+              Before the show, we&apos;ll match you with the right interest group so you can connect with people who get you.
             </p>
             <div className="space-y-3">
               <input
@@ -412,247 +266,154 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
           </motion.div>
         )}
 
-        {/* ─── Conversation Cards ─── */}
-        {phase === "cards" && (
+        {/* ─── Segmentation Questions (chatbot-style) ─── */}
+        {phase === "questions" && (
           <motion.div
-            key="cards-wrapper"
+            key={`q-${currentStep}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex items-center gap-8 max-w-4xl w-full mx-4"
-            ref={cardContainerRef}
+            className="w-full max-w-lg"
           >
-            {/* Left: Global countdown */}
-            <div className="flex-shrink-0 text-center w-28">
-              <div className="relative w-24 h-24 mx-auto mb-3">
-                {/* Circular progress ring */}
-                <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
-                  <circle
-                    cx="48" cy="48" r="42"
-                    fill="none"
-                    stroke="var(--room-surface)"
-                    strokeWidth="3"
-                  />
-                  <circle
-                    cx="48" cy="48" r="42"
-                    fill="none"
-                    stroke="var(--room-accent)"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 42}`}
-                    strokeDashoffset={`${2 * Math.PI * 42 * (1 - globalTimeLeft / countdownDuration)}`}
-                    style={{ transition: "stroke-dashoffset 1s linear" }}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-lg font-mono font-bold text-[var(--room-text)]">
-                    {formatTime(globalTimeLeft)}
-                  </span>
-                </div>
-              </div>
-              <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-text-muted)]">
-                Until Screening
-              </p>
-
-              {/* Card indicators */}
-              <div className="flex gap-1.5 justify-center mt-4">
-                {ICEBREAKER_CARDS.map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      i < currentCardIndex
-                        ? "bg-[var(--room-accent)] scale-100"
-                        : i === currentCardIndex
-                        ? "bg-[var(--room-gold)] scale-125"
-                        : "bg-[var(--room-surface)] scale-100"
-                    }`}
-                  />
-                ))}
-              </div>
+            {/* Progress dots */}
+            <div className="flex gap-2 justify-center mb-8">
+              {SEGMENTATION_QUESTIONS.map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    i < currentStep
+                      ? "w-8 bg-[var(--room-accent)]"
+                      : i === currentStep
+                      ? "w-8 bg-[var(--room-gold)]"
+                      : "w-4 bg-[var(--room-surface)]"
+                  }`}
+                />
+              ))}
             </div>
 
-            {/* Center: Card with GSAP 3D */}
-            <div className="flex-1" style={{ transformStyle: "preserve-3d" }}>
-              <div ref={cardRef} key={`card-${currentCardIndex}`} style={{ transformStyle: "preserve-3d" }}>
-                {/* Card timer bar */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-[10px] text-[var(--room-text-muted)] mb-1.5">
-                    <span className="tracking-[0.15em] uppercase">
-                      Card {currentCardIndex + 1} of {ICEBREAKER_CARDS.length}
-                    </span>
-                    <span className={`font-mono ${cardTimeLeft <= 10 ? "text-[var(--room-red)]" : ""}`}>
-                      {cardTimeLeft}s left
-                    </span>
-                  </div>
-                  <div className="h-1 bg-[var(--room-surface)] rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-1000 linear ${cardTimeLeft <= 10 ? "bg-[var(--room-red)]" : "bg-[var(--room-accent)]"}`}
-                      style={{ width: `${100 - cardProgress}%` }}
-                    />
+            <div ref={stepRef}>
+              {/* Question label */}
+              <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-text-muted)] mb-3">
+                {currentQuestion.signal}
+              </p>
+
+              {/* Question text */}
+              <h2 className="text-lg font-medium mb-6 leading-relaxed">
+                {currentQuestion.question}
+              </h2>
+
+              {/* Text input questions */}
+              {!currentQuestion.type && (
+                <div className="space-y-3">
+                  <input
+                    value={textAnswer}
+                    onChange={(e) => setTextAnswer(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && submitTextAnswer()}
+                    className="room-input text-sm"
+                    placeholder={currentQuestion.placeholder}
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={submitTextAnswer}
+                      disabled={!textAnswer.trim()}
+                      className="btn-accent flex-1 text-sm"
+                    >
+                      Continue
+                    </button>
+                    <button
+                      onClick={() => advanceStep([...responses, { questionId: currentQuestion.id, answer: "(skipped)" }])}
+                      className="btn-ghost text-sm px-4"
+                    >
+                      Skip
+                    </button>
                   </div>
                 </div>
+              )}
 
-                {/* The card itself — image + input with 3D depth */}
-                <div className="icebreaker-card overflow-hidden" style={{ transformStyle: "preserve-3d" }}>
-                  {/* Card image with parallax */}
-                  <div className="relative w-full card-image overflow-hidden" style={{ maxHeight: "360px" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={card.image}
-                      alt={`${card.author}: ${card.prompt}`}
-                      className="w-full h-auto object-contain"
-                      style={{ maxHeight: "360px", willChange: "transform" }}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                        const fallback = (e.target as HTMLImageElement).nextElementSibling;
-                        if (fallback) (fallback as HTMLElement).style.display = "block";
-                      }}
-                    />
-                    {/* Text fallback (hidden by default, shown if image fails) */}
-                    <div className="card-prompt-text p-8 text-center" style={{ display: "none" }}>
-                      <p className="text-[9px] tracking-[0.25em] uppercase text-[var(--room-text-muted)] mb-6">
-                        The Diary of a CEO Conversation Cards
-                      </p>
-                      <p className="text-xl font-medium leading-relaxed mb-2 icebreaker-prompt">
-                        {card.prompt}
-                      </p>
-                      <p className="text-xs text-[var(--room-text-muted)]">
-                        — {card.author}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Input area */}
-                  <div className="card-input-area p-6 space-y-3">
-                    <input
-                      value={answer}
-                      onChange={(e) => setAnswer(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && submitAnswer()}
-                      className="room-input text-sm"
-                      placeholder="Type your answer..."
-                      autoFocus
-                    />
-                    <div className="flex gap-2">
+              {/* Multi/single select questions */}
+              {currentQuestion.type && currentQuestion.options && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {currentQuestion.options.map((opt) => (
                       <button
-                        onClick={submitAnswer}
-                        disabled={!answer.trim()}
-                        className="btn-accent flex-1 text-sm"
+                        key={opt.label}
+                        onClick={() => toggleOption(opt.label)}
+                        className={`p-4 rounded-xl border text-left transition-all ${
+                          selectedOptions.includes(opt.label)
+                            ? "border-[var(--room-accent)] bg-[var(--room-surface-hover)] scale-[1.02]"
+                            : "border-[var(--room-border)] bg-[var(--room-surface)] hover:border-[var(--room-border-active)]"
+                        }`}
                       >
-                        Submit
+                        <span className="text-2xl mb-2 block">{opt.emoji}</span>
+                        <span className="text-sm font-medium block">{opt.label}</span>
+                        <span className="text-[10px] text-[var(--room-text-muted)] block mt-0.5">{opt.description}</span>
                       </button>
-                      <button
-                        onClick={() => {
-                          if (cardRef.current) {
-                            gsap.to(cardRef.current, {
-                              opacity: 0,
-                              x: -60,
-                              rotateY: -8,
-                              duration: 0.3,
-                              ease: "power2.in",
-                              onComplete: () => {
-                                setAnswer("");
-                                advanceCard();
-                              },
-                            });
-                          } else {
-                            setAnswer("");
-                            advanceCard();
-                          }
-                        }}
-                        className="btn-ghost text-sm px-4"
-                      >
-                        Skip
-                      </button>
-                    </div>
+                    ))}
                   </div>
+                  {currentQuestion.type === "multi-select" && (
+                    <p className="text-[10px] text-[var(--room-text-muted)] text-center">
+                      Choose as many as you like
+                    </p>
+                  )}
+                  <button
+                    onClick={submitOptionAnswer}
+                    disabled={selectedOptions.length === 0}
+                    className="btn-accent w-full text-sm py-3"
+                  >
+                    Continue
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
           </motion.div>
         )}
 
-        {/* ─── Matching Phase ─── */}
-        {phase === "matching" && (
+        {/* ─── Processing ─── */}
+        {phase === "processing" && (
           <motion.div
-            key="matching"
+            key="processing"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="text-center max-w-md mx-4"
+            className="text-center max-w-md"
           >
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
               className="w-12 h-12 mx-auto mb-4 rounded-full border-2 border-[var(--room-accent)] border-t-transparent"
             />
-            <p className="text-lg font-medium mb-2">Finding your match</p>
+            <p className="text-lg font-medium mb-2">Finding your interest group</p>
             <p className="text-sm text-[var(--room-text-secondary)]">
-              Analyzing your answers to find a kindred spirit...
-            </p>
-            <p className="text-[10px] text-[var(--room-text-muted)] mt-3">
-              Powered by Claude AI
+              Matching you with people who share your vibe...
             </p>
           </motion.div>
         )}
 
-        {/* ─── Match Reveal ─── */}
-        {phase === "reveal" && match && (
+        {/* ─── Ready ─── */}
+        {phase === "ready" && (
           <motion.div
-            key="reveal"
-            initial={{ opacity: 0, scale: 0.9 }}
+            key="ready"
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="max-w-lg w-full mx-4"
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="text-center max-w-md"
           >
-            <div className="text-center mb-6">
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-[10px] tracking-[0.3em] uppercase text-[var(--room-gold)] font-medium"
-              >
-                Your Connection for Tonight
-              </motion.p>
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="match-card p-6"
+            <p className="text-[10px] tracking-[0.3em] uppercase text-[var(--room-gold)] font-medium mb-4">
+              You&apos;re all set
+            </p>
+            <h2 className="text-xl font-bold mb-2">Welcome, {displayName}</h2>
+            <p className="text-sm text-[var(--room-text-secondary)] mb-6">
+              {globalTimeLeft > 0
+                ? `The screening starts in ${formatTime(globalTimeLeft)}. Get comfortable.`
+                : "The screening is ready. Let's go."}
+            </p>
+            <button
+              onClick={onComplete}
+              className="btn-accent text-sm py-3 px-8"
             >
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-14 h-14 rounded-full bg-[var(--room-surface-hover)] border border-[var(--room-border-active)] flex items-center justify-center text-[var(--room-text)] text-xl font-bold flex-shrink-0">
-                  {match.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">{match.name}</h3>
-                  <p className="text-xs text-[var(--room-text-muted)]">Matched by Claude AI</p>
-                </div>
-              </div>
-
-              <div className="mb-4 p-3 rounded-lg bg-[var(--room-bg)] border border-[var(--room-border)]">
-                <p className="text-xs text-[var(--room-accent)] font-medium mb-1">Why you were matched</p>
-                <p className="text-sm text-[var(--room-text-secondary)] leading-relaxed">
-                  {match.reason}
-                </p>
-              </div>
-
-              {match.answers.length > 0 && (
-                <div className="space-y-2 mb-4">
-                  <p className="text-[10px] tracking-[0.15em] uppercase text-[var(--room-text-muted)]">Their answers</p>
-                  {match.answers.map((a, i) => (
-                    <p key={i} className="text-xs text-[var(--room-text-secondary)] italic pl-3 border-l-2 border-[var(--room-border)]">
-                      &ldquo;{a}&rdquo;
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              <button onClick={onComplete} className="btn-accent w-full text-sm py-3 mt-2">
-                Enter the Screening Room
-              </button>
-            </motion.div>
+              Enter the Screening Room
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

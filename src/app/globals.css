@@ -297,7 +297,7 @@ html, body {
   z-index: 20;
 }
 
-/* ─── Cinema Curtains (DOAC black/gold) ─── */
+/* ─── Cinema Curtains (FlightStory black/gold) ─── */
 .curtain-panel {
   background: linear-gradient(180deg, #0a0a0a 0%, #141414 30%, #1a1a1a 60%, #141414 100%);
 }

@@ -6,8 +6,8 @@ export async function GET() {
     return NextResponse.json({
       event: {
         id: "demo-event",
-        title: "BTD Exclusive Screening",
-        mux_playback_id: null,
+        title: "FlightStory Community Screening",
+        mux_playback_id: process.env.NEXT_PUBLIC_MUX_PLAYBACK_ID || null,
         status: "live",
         created_at: new Date().toISOString(),
       },
