@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import CommunitySegmentFlow from "@/components/CommunitySegmentFlow";
+import ScreeningCards from "@/components/ScreeningCards";
+import PresenceCounter from "@/components/PresenceCounter";
 import { getPreShowPhase, PHASE_LABELS } from "@/lib/preshow";
 import type { PreShowPhase } from "@/lib/types";
 
@@ -62,7 +63,6 @@ export default function PreShowExperience({
   // Curtain phase: auto-trigger live transition
   useEffect(() => {
     if (phase === "curtain") {
-      // Small delay for the flash animation, then go live
       const timer = setTimeout(() => onComplete(), 1500);
       return () => clearTimeout(timer);
     }
@@ -87,6 +87,10 @@ export default function PreShowExperience({
 
   // During silence + curtain, override all content
   const showSilenceOverlay = phase === "silence" || phase === "curtain";
+
+  // Show cards during warmup, atmosphere during arrival
+  const showCards = phase === "warmup";
+  const showArrival = phase === "arrival";
 
   return (
     <div className="relative w-full h-full flex items-center justify-center">
@@ -121,23 +125,94 @@ export default function PreShowExperience({
         </motion.div>
       )}
 
-      {/* ─── Main Content (segmentation flow) ─── */}
+      {/* ─── Main Content ─── */}
       <AnimatePresence mode="wait">
         {!showSilenceOverlay ? (
           <motion.div
-            key="content"
-            initial={{ opacity: 1 }}
+            key={showCards ? "cards" : "arrival"}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.8 } }}
             className="relative z-[5] w-full h-full flex items-center justify-center"
           >
-            <CommunitySegmentFlow
-              eventId={eventId}
-              viewerId={viewerId}
-              countdownStart={countdownStart}
-              countdownDuration={countdownDuration}
-              onComplete={onComplete}
-              onCardChange={onCardChange}
-            />
+            {/* ─── Arrival Phase: Atmospheric countdown + presence ─── */}
+            {showArrival && (
+              <div className="text-center">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 1, delay: 0.5 }}
+                  className="mb-8"
+                >
+                  <p className="text-[10px] tracking-[0.3em] uppercase text-[var(--room-gold)] font-medium mb-4">
+                    Community Screening
+                  </p>
+                  <h1 className="text-2xl font-bold mb-3">Take your seat</h1>
+                  <p className="text-sm text-[var(--room-text-secondary)] max-w-md mx-auto">
+                    The screening begins shortly. Settle in and say hello in the chat.
+                  </p>
+                </motion.div>
+
+                {/* Countdown pill */}
+                {countdownStart && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1 }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)] mx-auto w-fit"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
+                    <span className="text-sm font-mono font-medium text-[var(--room-text)]">{formatTime(timeLeft)}</span>
+                    <span className="text-[10px] text-[var(--room-text-muted)] tracking-wider uppercase">until screening</span>
+                  </motion.div>
+                )}
+              </div>
+            )}
+
+            {/* ─── Warmup Phase: Conversation Cards ─── */}
+            {showCards && (
+              <div className="w-full max-w-2xl mx-auto flex flex-col h-full px-4">
+                {/* Countdown pill */}
+                <div className="flex flex-col items-center gap-2 py-4 flex-shrink-0">
+                  {countdownStart && timeLeft > 0 && (
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
+                      <span className="text-sm font-mono font-medium text-[var(--room-text)]">{formatTime(timeLeft)}</span>
+                      <span className="text-[10px] text-[var(--room-text-muted)] tracking-wider uppercase">until screening</span>
+                    </div>
+                  )}
+                </div>
+                {/* Cards */}
+                <div className="flex-1 min-h-0">
+                  <ScreeningCards
+                    eventId={eventId}
+                    viewerId={viewerId}
+                    onCardChange={onCardChange}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ─── Build Phase: Anticipation, screen simplifies ─── */}
+            {phase === "build" && (
+              <div className="text-center">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 2 }}
+                >
+                  <p className="text-[10px] tracking-[0.3em] uppercase text-[var(--room-gold)] font-medium mb-4">
+                    Get ready
+                  </p>
+                  <span
+                    className="font-mono font-bold text-[var(--room-text)] block"
+                    style={{ fontSize: "clamp(3rem, 8vw, 5rem)" }}
+                  >
+                    {formatTime(timeLeft)}
+                  </span>
+                </motion.div>
+              </div>
+            )}
           </motion.div>
         ) : (
           /* ─── Silence / Curtain Phase ─── */

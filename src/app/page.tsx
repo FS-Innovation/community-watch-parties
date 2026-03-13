@@ -17,7 +17,7 @@ import { PHASE_LABELS } from "@/lib/preshow";
 import { getViewerId } from "@/lib/viewer";
 
 const DEMO_EVENT_ID = "demo-event";
-const DEFAULT_COUNTDOWN = 600; // 10 minutes (3 min questions + 3 min cards + 3 min build + 1 min silence)
+const DEFAULT_COUNTDOWN = 600; // 10 minutes (3 min arrival + 3 min cards + 3 min build + 1 min silence)
 
 export default function Room() {
   const [eventId] = useState(DEMO_EVENT_ID);
@@ -78,8 +78,8 @@ export default function Room() {
   }, []);
 
   // ─── Auto-start countdown when page loads ───
-  // If event is still "waiting", auto-trigger countdown so the 15-min
-  // timer starts immediately for the community segment experience
+  // If event is still "waiting", auto-trigger countdown so the 10-min
+  // pre-show timer starts immediately
   useEffect(() => {
     if (eventStatus === "waiting" && !autoStartedRef.current) {
       autoStartedRef.current = true;
@@ -112,19 +112,19 @@ export default function Room() {
     return () => clearTimeout(timer);
   }, [arrived, eventId]);
 
-  // ─── Late joiner: skip segmentation only if event was already live on first load ───
+  // ─── Late joiner: skip pre-show only if event was already live on first load ───
   const initialStatusRef = useRef<string | null>(null);
   useEffect(() => {
     if (initialStatusRef.current === null && eventStatus !== "waiting") {
       initialStatusRef.current = eventStatus;
     }
-    // Only skip segmentation if the event was already live/ended when we FIRST loaded
+    // Only skip pre-show if the event was already live/ended when we FIRST loaded
     if (initialStatusRef.current === "live" || initialStatusRef.current === "ended") {
       setSegmentComplete(true);
     }
   }, [eventStatus]);
 
-  // ─── Auto-go-live when segmentation + conversation cards complete ───
+  // ─── Auto-go-live when pre-show completes ───
   const handleSegmentComplete = useCallback(() => {
     setSegmentComplete(true);
 
@@ -150,7 +150,7 @@ export default function Room() {
     }
   }, [eventId, countdownStart, countdownDuration, poll]);
 
-  // ─── Auto-go-live when countdown finishes (if icebreaker is done) ───
+  // ─── Auto-go-live when countdown finishes (if pre-show is done) ───
   useEffect(() => {
     if (!countdownStart || !segmentComplete || eventStatus === "live" || eventStatus === "ended") return;
 
@@ -338,7 +338,7 @@ export default function Room() {
         {!segmentComplete ? (
           /* ─── Pre-show: Phase-driven experience ─── */
           <div className="flex flex-1 min-h-0">
-            {/* Center: phase-driven pre-show (questions → cards → build → silence → curtain) */}
+            {/* Center: phase-driven pre-show (arrival → cards → build → silence → curtain) */}
             <div className="flex-1 min-h-0 overflow-hidden">
               <PreShowExperience
                 eventId={eventId}

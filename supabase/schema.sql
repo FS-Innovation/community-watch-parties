@@ -47,17 +47,6 @@ create table if not exists chat_messages (
   created_at timestamp with time zone default now()
 );
 
--- ─── Icebreaker Responses ───
-create table if not exists icebreaker_responses (
-  id uuid default uuid_generate_v4() primary key,
-  event_id uuid references events(id) on delete cascade,
-  viewer_id text not null,
-  display_name text not null,
-  prompt text not null,
-  answer text not null,
-  created_at timestamp with time zone default now()
-);
-
 -- ─── Indexes ───
 create index if not exists idx_cards_event on conversation_cards(event_id);
 create index if not exists idx_cards_trigger on conversation_cards(trigger_time_seconds);
@@ -65,29 +54,27 @@ create index if not exists idx_card_responses_card on card_responses(card_id);
 create index if not exists idx_card_responses_event on card_responses(event_id);
 create index if not exists idx_chat_event on chat_messages(event_id);
 create index if not exists idx_chat_created on chat_messages(created_at);
-create index if not exists idx_icebreaker_event on icebreaker_responses(event_id);
-create index if not exists idx_icebreaker_viewer on icebreaker_responses(viewer_id);
+
 -- ─── Row Level Security ───
 alter table events enable row level security;
 alter table conversation_cards enable row level security;
 alter table card_responses enable row level security;
 alter table chat_messages enable row level security;
-alter table icebreaker_responses enable row level security;
+
 -- Public read for events, cards, chat
 create policy "anon_read_events" on events for select using (true);
 create policy "anon_read_cards" on conversation_cards for select using (true);
 create policy "anon_read_chat" on chat_messages for select using (true);
 
--- Anon can insert responses, chat, icebreaker
+-- Anon can insert responses, chat
 create policy "anon_insert_responses" on card_responses for insert with check (true);
 create policy "anon_insert_chat" on chat_messages for insert with check (true);
-create policy "anon_read_icebreaker" on icebreaker_responses for select using (true);
-create policy "anon_insert_icebreaker" on icebreaker_responses for insert with check (true);
+
 -- Service role full access
 create policy "service_events" on events for all using (auth.role() = 'service_role');
 create policy "service_cards" on conversation_cards for all using (auth.role() = 'service_role');
 create policy "service_responses" on card_responses for all using (auth.role() = 'service_role');
 create policy "service_chat" on chat_messages for all using (auth.role() = 'service_role');
-create policy "service_icebreaker" on icebreaker_responses for all using (auth.role() = 'service_role');
+
 -- Enable realtime for chat
 alter publication supabase_realtime add table chat_messages;
