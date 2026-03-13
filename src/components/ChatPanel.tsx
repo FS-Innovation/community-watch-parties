@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getViewerId, getViewerName, setViewerName } from "@/lib/viewer";
+import type { PreShowPhase } from "@/lib/types";
 
 interface ChatMessage {
   id: string;
@@ -18,9 +19,10 @@ interface Props {
   onToggle: () => void;
   inline?: boolean;
   cardPrompt?: string | null;
+  phase?: PreShowPhase | null;
 }
 
-export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPrompt }: Props) {
+export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPrompt, phase }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -84,14 +86,34 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
   };
 
   // Inline mode: renders as a flex column filling parent container
+  // Glassmorphic during social phases (arrival, warmup), fades to minimal during build/silence
+  const isSocialPhase = !phase || phase === "arrival" || phase === "warmup";
+
   if (inline) {
     return (
-      <div className="relative flex flex-col h-full w-full overflow-hidden">
+      <div
+        className={`relative flex flex-col h-full w-full overflow-hidden transition-all duration-1000 ${
+          isSocialPhase
+            ? "bg-white/[0.04] backdrop-blur-xl"
+            : "bg-transparent backdrop-blur-none"
+        }`}
+        style={isSocialPhase ? {
+          boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 40px rgba(255,255,255,0.02)",
+        } : undefined}
+      >
+        {/* Subtle glass shine on left edge */}
+        {isSocialPhase && (
+          <div
+            className="absolute top-0 left-0 bottom-0 w-px pointer-events-none"
+            style={{ background: "linear-gradient(180deg, transparent, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.06) 70%, transparent)" }}
+          />
+        )}
+
         {/* Header */}
-        <div className="p-4 border-b border-[var(--room-border)] flex items-center justify-between flex-shrink-0">
+        <div className="p-4 border-b border-white/[0.08] flex items-center justify-between flex-shrink-0">
           <div>
-            <h3 className="font-semibold text-sm">Chat</h3>
-            <p className="text-[10px] text-[var(--room-text-muted)]">Whisper in the dark</p>
+            <h3 className={`font-semibold text-sm transition-colors duration-700 ${isSocialPhase ? "text-white/90" : "text-white/50"}`}>Chat</h3>
+            <p className={`text-[10px] transition-colors duration-700 ${isSocialPhase ? "text-white/40" : "text-white/20"}`}>Whisper in the dark</p>
           </div>
           <button onClick={onToggle} className="text-[var(--room-text-muted)] hover:text-[var(--room-text)] transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,9 +124,13 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
 
         {/* Card prompt context — shows what the current conversation card is */}
         {cardPrompt && (
-          <div className="px-4 py-3 border-b border-[var(--room-border)] flex-shrink-0 bg-[var(--room-surface)]">
-            <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-gold)] mb-1">Discussing</p>
-            <p className="text-xs text-[var(--room-text-secondary)] leading-relaxed italic">
+          <div className={`px-4 py-3 border-b border-white/[0.06] flex-shrink-0 transition-colors duration-700 ${
+            isSocialPhase ? "bg-white/[0.04]" : "bg-white/[0.02]"
+          }`}>
+            <p className="text-[9px] tracking-[0.2em] uppercase text-amber-400/70 mb-1">Discussing</p>
+            <p className={`text-xs leading-relaxed italic transition-colors duration-700 ${
+              isSocialPhase ? "text-white/60" : "text-white/30"
+            }`}>
               &ldquo;{cardPrompt}&rdquo;
             </p>
           </div>
@@ -113,7 +139,9 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
         {/* Messages */}
         <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
           {messages.length === 0 && (
-            <p className="text-xs text-[var(--room-text-muted)] text-center py-8">
+            <p className={`text-xs text-center py-8 transition-colors duration-700 ${
+              isSocialPhase ? "text-white/30" : "text-white/15"
+            }`}>
               No messages yet. Say something...
             </p>
           )}
@@ -122,12 +150,12 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
               key={msg.id}
               className={`text-sm ${msg.viewer_id === viewerId ? "text-right" : ""}`}
             >
-              <span className="text-[10px] text-[var(--room-text-muted)]">{msg.display_name}</span>
+              <span className="text-[10px] text-white/40">{msg.display_name}</span>
               <div
                 className={`mt-0.5 inline-block px-3 py-1.5 rounded-xl text-xs max-w-[85%] ${
                   msg.viewer_id === viewerId
-                    ? "bg-[var(--room-surface-hover)] text-[var(--room-text)] border border-[var(--room-border-active)] rounded-br-sm"
-                    : "bg-[var(--room-surface)] text-[var(--room-text)] rounded-bl-sm"
+                    ? "bg-white/[0.1] text-white/90 border border-white/[0.12] rounded-br-sm"
+                    : "bg-white/[0.06] text-white/80 rounded-bl-sm"
                 }`}
               >
                 {msg.text}
@@ -138,7 +166,9 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
         </div>
 
         {/* Input — always visible at bottom */}
-        <div className="p-3 border-t border-[var(--room-border)] flex-shrink-0 bg-[var(--room-bg)]">
+        <div className={`p-3 border-t border-white/[0.08] flex-shrink-0 transition-colors duration-700 ${
+          isSocialPhase ? "bg-white/[0.03]" : "bg-transparent"
+        }`}>
           {!nameSet && (
             <input
               value={displayName}
@@ -150,7 +180,7 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
                   setTimeout(() => inputRef.current?.focus(), 50);
                 }
               }}
-              className="room-input text-xs mb-2"
+              className="w-full px-3 py-2.5 rounded-lg text-xs mb-2 outline-none transition-colors bg-white/[0.08] border border-white/[0.12] text-white/90 placeholder:text-white/30 focus:border-white/25 focus:bg-white/[0.1]"
               placeholder="Enter your name to chat..."
               autoFocus
             />
@@ -161,14 +191,14 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              className="room-input flex-1 text-xs"
+              className="flex-1 px-3 py-2.5 rounded-lg text-xs outline-none transition-colors bg-white/[0.08] border border-white/[0.12] text-white/90 placeholder:text-white/30 focus:border-white/25 focus:bg-white/[0.1] disabled:opacity-30"
               placeholder={nameSet ? (cardPrompt ? "Share your thoughts..." : "Type a message...") : "Set your name first..."}
               disabled={!nameSet}
             />
             <button
               onClick={sendMessage}
               disabled={!input.trim() || !nameSet}
-              className="btn-accent text-xs px-3"
+              className="px-3 py-2.5 rounded-lg text-xs font-semibold transition-all bg-white/[0.15] text-white/90 border border-white/[0.12] hover:bg-white/[0.2] disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Send
             </button>
