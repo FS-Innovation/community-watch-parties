@@ -66,8 +66,9 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [responses, setResponses] = useState<SegmentResponse[]>([]);
   const [globalTimeLeft, setGlobalTimeLeft] = useState(countdownDuration);
-  const [phase, setPhase] = useState<"name" | "questions" | "processing" | "ready">("name");
+  const [phase, setPhase] = useState<"name" | "questions" | "processing" | "ready" | "picking">("name");
   const [assignedSegment, setAssignedSegment] = useState<string | null>(null);
+  const [placementMessage, setPlacementMessage] = useState<string | null>(null);
   const [matchResult, setMatchResult] = useState<{ name: string; reason: string } | null>(null);
   const stepRef = useRef<HTMLDivElement>(null);
 
@@ -198,6 +199,7 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
       });
       const data = await res.json();
       if (data.segment) setAssignedSegment(data.segment);
+      if (data.placement_message) setPlacementMessage(data.placement_message);
       if (data.match) setMatchResult({ name: data.match.name, reason: data.match.reason });
     } catch { /* continue anyway */ }
 
@@ -390,56 +392,138 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
           </motion.div>
         )}
 
-        {/* ─── Ready: Show AI-assigned segment ─── */}
+        {/* ─── Ready: Conversational AI placement ─── */}
         {phase === "ready" && (
           <motion.div
             key="ready"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="text-center max-w-md"
+            className="w-full max-w-lg"
           >
-            <p className="text-[10px] tracking-[0.3em] uppercase text-[var(--room-gold)] font-medium mb-4">
-              You&apos;re all set
-            </p>
-            <h2 className="text-xl font-bold mb-2">Welcome, {displayName}</h2>
-
-            {/* AI-assigned interest group */}
+            {/* Segment badge */}
             {assignedSegment && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="mb-5 p-4 rounded-xl bg-[var(--room-surface)] border border-[var(--room-border)]"
+                className="flex items-center gap-3 mb-6"
               >
-                <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-text-muted)] mb-2">
-                  Your interest group
-                </p>
-                <p className="text-lg font-semibold text-[var(--room-text)]">
-                  {assignedSegment === "Reflection" && "🪞 "}
-                  {assignedSegment === "Building" && "🔨 "}
-                  {assignedSegment === "Creativity" && "🎨 "}
-                  {assignedSegment === "Connection" && "🤝 "}
-                  {assignedSegment}
-                </p>
-                {matchResult && (
-                  <p className="text-xs text-[var(--room-text-secondary)] mt-2 leading-relaxed">
-                    Matched with <span className="font-medium text-[var(--room-text)]">{matchResult.name}</span> — {matchResult.reason}
+                <div className="w-12 h-12 rounded-2xl bg-[var(--room-surface)] border border-[var(--room-border)] flex items-center justify-center text-2xl">
+                  {assignedSegment === "Reflection" && "🪞"}
+                  {assignedSegment === "Building" && "🔨"}
+                  {assignedSegment === "Creativity" && "🎨"}
+                  {assignedSegment === "Connection" && "🤝"}
+                </div>
+                <div>
+                  <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-text-muted)]">
+                    Your room
                   </p>
-                )}
+                  <p className="text-lg font-semibold text-[var(--room-text)]">
+                    {assignedSegment}
+                  </p>
+                </div>
               </motion.div>
             )}
 
-            <p className="text-sm text-[var(--room-text-secondary)] mb-6">
-              {globalTimeLeft > 0
-                ? `The screening starts in ${formatTime(globalTimeLeft)}. Get comfortable.`
-                : "The screening is ready. Let's go."}
-            </p>
-            <button
-              onClick={onComplete}
-              className="btn-accent text-sm py-3 px-8"
+            {/* AI conversational message */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="p-5 rounded-2xl bg-[var(--room-surface)] border border-[var(--room-border)] mb-6"
             >
-              Enter the Screening Room
+              <p className="text-sm leading-relaxed text-[var(--room-text)]">
+                {placementMessage || (assignedSegment
+                  ? `Based on what you shared, we're taking you to the ${assignedSegment} room with others who share your energy. How does this sound?`
+                  : "We've found you a great spot for tonight's screening. How does this sound?"
+                )}
+              </p>
+              {matchResult && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="text-xs text-[var(--room-text-secondary)] mt-3 pt-3 border-t border-[var(--room-border)] leading-relaxed"
+                >
+                  We also matched you with <span className="font-medium text-[var(--room-text)]">{matchResult.name}</span> — {matchResult.reason}
+                </motion.p>
+              )}
+            </motion.div>
+
+            {/* Action buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="space-y-3"
+            >
+              <button
+                onClick={onComplete}
+                className="btn-accent w-full text-sm py-3"
+              >
+                Let&apos;s do it
+              </button>
+              <button
+                onClick={() => setPhase("picking")}
+                className="btn-ghost w-full text-sm py-3"
+              >
+                I&apos;d prefer a different room
+              </button>
+              {globalTimeLeft > 0 && (
+                <p className="text-[11px] text-[var(--room-text-muted)] text-center">
+                  Screening starts in {formatTime(globalTimeLeft)}
+                </p>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* ─── Picking: Choose a different segment ─── */}
+        {phase === "picking" && (
+          <motion.div
+            key="picking"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="w-full max-w-lg"
+          >
+            <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-text-muted)] mb-3">
+              Pick your room
+            </p>
+            <h2 className="text-lg font-medium mb-6 leading-relaxed">
+              No worries — which room feels more like you?
+            </h2>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {[
+                { label: "Reflection", emoji: "🪞", description: "Meaning-seekers who go deep" },
+                { label: "Building", emoji: "🔨", description: "Builders creating something new" },
+                { label: "Creativity", emoji: "🎨", description: "Creatives exploring ideas" },
+                { label: "Connection", emoji: "🤝", description: "Connectors who bring people together" },
+              ].map((seg) => (
+                <button
+                  key={seg.label}
+                  onClick={() => {
+                    setAssignedSegment(seg.label);
+                    setPlacementMessage(`You got it — switching you to the ${seg.label} room. See you in there!`);
+                    setPhase("ready");
+                  }}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    assignedSegment === seg.label
+                      ? "border-[var(--room-accent)] bg-[var(--room-surface-hover)]"
+                      : "border-[var(--room-border)] bg-[var(--room-surface)] hover:border-[var(--room-border-active)]"
+                  }`}
+                >
+                  <span className="text-2xl mb-2 block">{seg.emoji}</span>
+                  <span className="text-sm font-medium block">{seg.label}</span>
+                  <span className="text-[10px] text-[var(--room-text-muted)] block mt-0.5">{seg.description}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPhase("ready")}
+              className="btn-ghost w-full text-sm py-2"
+            >
+              Actually, take me back
             </button>
           </motion.div>
         )}

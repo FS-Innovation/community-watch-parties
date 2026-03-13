@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       segment,
       routing,
+      placement_message: `Based on what you shared, we're placing you in the ${segment} room — it felt like the best fit for what you're looking for tonight. How does this sound?`,
       match: bestMatch ? {
         name: bestMatch.display_name,
         viewer_id: bestMatch.viewer_id,
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     const message = await client.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 800,
+      max_tokens: 1024,
       messages: [
         {
           role: "user",
@@ -154,6 +155,7 @@ Respond in this exact JSON format (no markdown, no code blocks):
   "primary_segment": "one of: Reflection, Building, Creativity, Connection",
   "secondary_segment": "optional second segment or null",
   "intent_summary": "A 1-sentence summary of why they joined and what they're looking for",
+  "placement_message": "A warm, conversational 2-3 sentence message addressed directly to the viewer (use 'you') explaining WHY you're placing them in this segment. Reference something specific from their answers to show you actually read them. End with something like 'How does this sound?' Keep it casual and friendly, not corporate.",
   "match_index": 0,
   "match_reason": "A warm, specific 1-2 sentence explanation of why these two would connect well. Reference specific things from both their answers."
 }
@@ -193,6 +195,7 @@ The match_index is 0-based. Pick the candidate whose answers resonate most with 
       segment: parsed.primary_segment,
       secondary_segment: parsed.secondary_segment,
       intent_summary: parsed.intent_summary,
+      placement_message: parsed.placement_message,
       match: matched ? {
         name: matched.display_name,
         viewer_id: matched.viewer_id,
@@ -211,6 +214,7 @@ The match_index is 0-based. Pick the candidate whose answers resonate most with 
 
     return NextResponse.json({
       segment,
+      placement_message: `Based on what you shared, we're placing you in the ${segment} room — it felt like the best fit for what you're looking for tonight. How does this sound?`,
       match: fallback ? {
         name: fallback.display_name,
         viewer_id: fallback.viewer_id,
