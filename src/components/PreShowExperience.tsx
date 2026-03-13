@@ -110,20 +110,7 @@ export default function PreShowExperience({
         </motion.div>
       )}
 
-      {/* ─── Phase Label (subtle) ─── */}
-      {!showSilenceOverlay && (
-        <motion.div
-          key={phase}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="absolute top-4 left-1/2 -translate-x-1/2 z-10"
-        >
-          <span className="text-[9px] tracking-[0.25em] uppercase text-[var(--room-text-muted)] font-medium">
-            {PHASE_LABELS[phase]}
-          </span>
-        </motion.div>
-      )}
+      {/* Phase label removed — audience doesn't need to see internal phase names */}
 
       {/* ─── Main Content ─── */}
       <AnimatePresence mode="wait">
