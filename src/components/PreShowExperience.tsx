@@ -169,7 +169,7 @@ export default function PreShowExperience({
                   className="text-sm text-[var(--room-text-muted)] opacity-40 tracking-wide"
                 >
                   {timeLeft > 300
-                    ? "Welcome — the show is starting soon"
+                    ? "Grab your snacks, we're starting soon"
                     : timeLeft > 120
                       ? "The show is starting soon..."
                       : "Almost time..."}
