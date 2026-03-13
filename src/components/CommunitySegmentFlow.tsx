@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getViewerName, setViewerName } from "@/lib/viewer";
 import gsap from "gsap";
+import ScreeningCards from "@/components/ScreeningCards";
 
 // Community segmentation questions — chatbot-style flow
 // These gather motivation, intent, segment, and routing preferences
@@ -59,17 +60,16 @@ interface SegmentResponse {
   answer: string | string[];
 }
 
-export default function IcebreakerFlow({ eventId, viewerId, countdownStart, countdownDuration, onComplete }: Props) {
+export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart, countdownDuration, onComplete }: Props) {
   const [displayName, setDisplayName] = useState("");
   const [currentStep, setCurrentStep] = useState(0);
   const [textAnswer, setTextAnswer] = useState("");
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [responses, setResponses] = useState<SegmentResponse[]>([]);
   const [globalTimeLeft, setGlobalTimeLeft] = useState(countdownDuration);
-  const [phase, setPhase] = useState<"name" | "questions" | "processing" | "ready" | "picking">("name");
+  const [phase, setPhase] = useState<"name" | "questions" | "processing" | "ready" | "picking" | "cards">("name");
   const [assignedSegment, setAssignedSegment] = useState<string | null>(null);
   const [placementMessage, setPlacementMessage] = useState<string | null>(null);
-  const [matchResult, setMatchResult] = useState<{ name: string; reason: string } | null>(null);
   const stepRef = useRef<HTMLDivElement>(null);
 
   // Load saved name
@@ -200,7 +200,6 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
       const data = await res.json();
       if (data.segment) setAssignedSegment(data.segment);
       if (data.placement_message) setPlacementMessage(data.placement_message);
-      if (data.match) setMatchResult({ name: data.match.name, reason: data.match.reason });
     } catch { /* continue anyway */ }
 
     setPhase("ready");
@@ -219,6 +218,44 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
   };
 
   const currentQuestion = SEGMENTATION_QUESTIONS[currentStep];
+
+  // ─── Conversation cards phase (full-screen) ───
+  if (phase === "cards") {
+    return (
+      <div className="w-full h-full flex flex-col">
+        {/* Countdown pill at top */}
+        {countdownStart && globalTimeLeft > 0 && (
+          <div className="flex justify-center py-3 flex-shrink-0">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
+              <span className="text-sm font-mono font-medium text-[var(--room-text)]">{formatTime(globalTimeLeft)}</span>
+              <span className="text-[10px] text-[var(--room-text-muted)] tracking-wider uppercase">until screening</span>
+            </div>
+          </div>
+        )}
+        {/* Segment badge */}
+        {assignedSegment && (
+          <div className="flex items-center justify-center gap-2 pb-2 flex-shrink-0">
+            <span className="text-[10px] tracking-[0.15em] uppercase text-[var(--room-text-muted)]">
+              {assignedSegment === "Reflection" && "🪞"}
+              {assignedSegment === "Building" && "🔨"}
+              {assignedSegment === "Creativity" && "🎨"}
+              {assignedSegment === "Connection" && "🤝"}
+              {" "}{assignedSegment} Room
+            </span>
+          </div>
+        )}
+        {/* Cards */}
+        <div className="flex-1 min-h-0">
+          <ScreeningCards
+            eventId={eventId}
+            viewerId={viewerId}
+            onAllDone={onComplete}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center px-4">
@@ -304,7 +341,7 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
                 {currentQuestion.question}
               </h2>
 
-              {/* Text input questions */}
+              {/* Text input questions — no skip */}
               {!currentQuestion.type && (
                 <div className="space-y-3">
                   <input
@@ -315,25 +352,17 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
                     placeholder={currentQuestion.placeholder}
                     autoFocus
                   />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={submitTextAnswer}
-                      disabled={!textAnswer.trim()}
-                      className="btn-accent flex-1 text-sm"
-                    >
-                      Continue
-                    </button>
-                    <button
-                      onClick={() => advanceStep([...responses, { questionId: currentQuestion.id, answer: "(skipped)" }])}
-                      className="btn-ghost text-sm px-4"
-                    >
-                      Skip
-                    </button>
-                  </div>
+                  <button
+                    onClick={submitTextAnswer}
+                    disabled={!textAnswer.trim()}
+                    className="btn-accent w-full text-sm py-3"
+                  >
+                    Continue
+                  </button>
                 </div>
               )}
 
-              {/* Multi/single select questions */}
+              {/* Multi-select questions */}
               {currentQuestion.type && currentQuestion.options && (
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
@@ -438,16 +467,6 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
                   : "We've found you a great spot for tonight's screening. How does this sound?"
                 )}
               </p>
-              {matchResult && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="text-xs text-[var(--room-text-secondary)] mt-3 pt-3 border-t border-[var(--room-border)] leading-relaxed"
-                >
-                  We also matched you with <span className="font-medium text-[var(--room-text)]">{matchResult.name}</span> — {matchResult.reason}
-                </motion.p>
-              )}
             </motion.div>
 
             {/* Action buttons */}
@@ -458,7 +477,7 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
               className="space-y-3"
             >
               <button
-                onClick={onComplete}
+                onClick={() => setPhase("cards")}
                 className="btn-accent w-full text-sm py-3"
               >
                 Let&apos;s do it

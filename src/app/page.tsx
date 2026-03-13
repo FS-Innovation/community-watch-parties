@@ -8,8 +8,7 @@ import HostCameraLayer from "@/components/HostCameraLayer";
 import ConversationCardOverlay from "@/components/ConversationCardOverlay";
 import ChatPanel from "@/components/ChatPanel";
 import CinemaCurtains from "@/components/CinemaCurtains";
-import IcebreakerFlow from "@/components/IcebreakerFlow";
-import ScreeningCards from "@/components/ScreeningCards";
+import CommunitySegmentFlow from "@/components/CommunitySegmentFlow";
 import PresenceCounter from "@/components/PresenceCounter";
 import ThemeToggle from "@/components/ThemeToggle";
 import HostControlsPanel from "@/components/HostControlsPanel";
@@ -30,7 +29,7 @@ export default function Room() {
   const [currentTime, setCurrentTime] = useState(0);
   const [chatOpen, setChatOpen] = useState(true); // Chat open by default
   const [curtainsOpen, setCurtainsOpen] = useState(false);
-  const [icebreakerComplete, setIcebreakerComplete] = useState(false);
+  const [segmentComplete, setSegmentComplete] = useState(false);
   const [countdownStart, setCountdownStart] = useState<number | null>(null);
   const [countdownDuration, setCountdownDuration] = useState(DEFAULT_COUNTDOWN);
   const [hostPanelOpen, setHostPanelOpen] = useState(true); // Everyone is a host for now
@@ -76,8 +75,8 @@ export default function Room() {
   }, []);
 
   // ─── Auto-start countdown when page loads ───
-  // If event is still "waiting", auto-trigger countdown so the 5-min
-  // timer starts immediately for the icebreaker experience
+  // If event is still "waiting", auto-trigger countdown so the 15-min
+  // timer starts immediately for the community segment experience
   useEffect(() => {
     if (eventStatus === "waiting" && !autoStartedRef.current) {
       autoStartedRef.current = true;
@@ -110,23 +109,23 @@ export default function Room() {
     return () => clearTimeout(timer);
   }, [arrived, eventId]);
 
-  // ─── Late joiner: skip icebreaker only if event was already live on first load ───
+  // ─── Late joiner: skip segmentation only if event was already live on first load ───
   const initialStatusRef = useRef<string | null>(null);
   useEffect(() => {
     if (initialStatusRef.current === null && eventStatus !== "waiting") {
       initialStatusRef.current = eventStatus;
     }
-    // Only skip icebreaker if the event was already live/ended when we FIRST loaded
+    // Only skip segmentation if the event was already live/ended when we FIRST loaded
     if (initialStatusRef.current === "live" || initialStatusRef.current === "ended") {
-      setIcebreakerComplete(true);
+      setSegmentComplete(true);
     }
   }, [eventStatus]);
 
-  // ─── Auto-go-live when icebreaker completes ───
-  const handleIcebreakerComplete = useCallback(() => {
-    setIcebreakerComplete(true);
+  // ─── Auto-go-live when segmentation + conversation cards complete ───
+  const handleSegmentComplete = useCallback(() => {
+    setSegmentComplete(true);
 
-    // If countdown is still running, the curtains text shows "enjoy the show"
+    // If countdown is still running, curtains show "enjoy the show"
     // When countdown finishes, auto-go-live triggers below
     // If countdown already finished, go live now
     if (countdownStart) {
@@ -150,7 +149,7 @@ export default function Room() {
 
   // ─── Auto-go-live when countdown finishes (if icebreaker is done) ───
   useEffect(() => {
-    if (!countdownStart || !icebreakerComplete || eventStatus === "live" || eventStatus === "ended") return;
+    if (!countdownStart || !segmentComplete || eventStatus === "live" || eventStatus === "ended") return;
 
     const checkCountdown = () => {
       const elapsed = (Date.now() - countdownStart) / 1000;
@@ -176,7 +175,7 @@ export default function Room() {
       if (checkCountdown()) clearInterval(interval);
     }, 500);
     return () => clearInterval(interval);
-  }, [countdownStart, countdownDuration, icebreakerComplete, eventStatus, eventId, poll]);
+  }, [countdownStart, countdownDuration, segmentComplete, eventStatus, eventId, poll]);
 
   // ─── Check for conversation cards ───
   useEffect(() => {
@@ -233,11 +232,11 @@ export default function Room() {
   return (
     <main className="h-screen w-screen flex flex-col overflow-hidden bg-[var(--room-bg)]">
       {/* Cinema Curtains — only during screening room transition */}
-      {icebreakerComplete && <CinemaCurtains isOpen={curtainsOpen} />}
+      {segmentComplete && <CinemaCurtains isOpen={curtainsOpen} />}
 
       {/* Spotlight reveal overlay */}
       <AnimatePresence>
-        {arrived && !icebreakerComplete && (
+        {arrived && !segmentComplete && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -277,7 +276,7 @@ export default function Room() {
           <PresenceCounter eventId={eventId} />
           <ThemeToggle />
           {/* Camera toggle — everyone can go on stage */}
-          {icebreakerComplete && (
+          {segmentComplete && (
             <button
               onClick={() => setHostVisible(!hostVisible)}
               className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
@@ -325,17 +324,17 @@ export default function Room() {
 
       {/* ─── Main Content ─── */}
       <div className="flex flex-col flex-1 min-h-0">
-        {!icebreakerComplete ? (
-          /* ─── Pre-show: Community Segmentation ─── */
+        {!segmentComplete ? (
+          /* ─── Pre-show: Community Segmentation + Conversation Cards ─── */
           <div className="flex flex-1 min-h-0">
-            {/* Center: segmentation flow */}
+            {/* Center: segmentation flow → conversation cards */}
             <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
-              <IcebreakerFlow
+              <CommunitySegmentFlow
                 eventId={eventId}
                 viewerId={viewerId}
                 countdownStart={countdownStart}
                 countdownDuration={countdownDuration}
-                onComplete={handleIcebreakerComplete}
+                onComplete={handleSegmentComplete}
               />
             </div>
             {/* Right: Chat (always available) */}
@@ -354,11 +353,11 @@ export default function Room() {
             </AnimatePresence>
           </div>
         ) : (
-          /* ─── Screening Room: Video top, Cards left + Chat right below ─── */
-          <>
-            {/* Video area */}
-            <div className="flex-shrink-0 p-4 pb-0">
-              <div className="relative">
+          /* ─── Screening Room: Video (mother screen) + Segment Chat ─── */
+          <div className="flex flex-1 min-h-0">
+            {/* Left: Video + reactions */}
+            <div className="flex-1 min-w-0 flex flex-col p-4">
+              <div className="relative flex-1">
                 <VideoPlayer
                   playbackId={playbackId}
                   syncState={syncState}
@@ -371,39 +370,28 @@ export default function Room() {
               </div>
             </div>
 
-            {/* Below video: Cards (left) + Chat (right) */}
-            <div className="flex flex-1 min-h-0">
-              {/* Left: Conversation Cards */}
-              <div className="flex-1 min-w-0 border-r border-[var(--room-border)]">
-                <ScreeningCards
-                  eventId={eventId}
-                  viewerId={viewerId}
-                />
-              </div>
-
-              {/* Right: Chat */}
-              <AnimatePresence>
-                {chatOpen && (
-                  <motion.div
-                    initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: 384, opacity: 1 }}
-                    exit={{ width: 0, opacity: 0 }}
-                    transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                    className="flex-shrink-0 flex flex-col bg-[var(--room-bg)] overflow-hidden"
-                  >
-                    <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Host side panel */}
-              {hostLayout === "side" && hostVisible && (
-                <div className="w-80 lg:w-96 flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] p-3">
-                  <HostCameraLayer layout="side" visible={true} />
-                </div>
+            {/* Right: Segment-based chat room */}
+            <AnimatePresence>
+              {chatOpen && (
+                <motion.div
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: 384, opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden"
+                >
+                  <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline />
+                </motion.div>
               )}
-            </div>
-          </>
+            </AnimatePresence>
+
+            {/* Host side panel */}
+            {hostLayout === "side" && hostVisible && (
+              <div className="w-80 lg:w-96 flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] p-3">
+                <HostCameraLayer layout="side" visible={true} />
+              </div>
+            )}
+          </div>
         )}
       </div>
 

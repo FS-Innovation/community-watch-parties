@@ -17,9 +17,10 @@ interface Props {
   eventId: string;
   viewerId: string;
   onRespond?: (prompt: string, answer: string) => void;
+  onAllDone?: () => void;
 }
 
-export default function ScreeningCards({ eventId, viewerId, onRespond }: Props) {
+export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone }: Props) {
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [timeLeft, setTimeLeft] = useState(CARD_DURATION);
@@ -160,9 +161,14 @@ export default function ScreeningCards({ eventId, viewerId, onRespond }: Props) 
         <p className="text-[10px] tracking-[0.3em] uppercase text-[var(--room-gold)] font-medium mb-3">
           All cards answered
         </p>
-        <p className="text-sm text-[var(--room-text-secondary)]">
+        <p className="text-sm text-[var(--room-text-secondary)] mb-4">
           Great reflections! Enjoy the rest of the screening.
         </p>
+        {onAllDone && (
+          <button onClick={onAllDone} className="btn-accent text-sm py-3 px-8">
+            Enter the Screening Room
+          </button>
+        )}
       </div>
     );
   }

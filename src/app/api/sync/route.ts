@@ -30,7 +30,7 @@ function getRoom(eventId: string): RoomState {
       host_layout: "pip",
       host_visible: true,
       countdown_start: null,
-      countdown_duration: 300,
+      countdown_duration: 900,
       curtains_open: false,
     };
   }
