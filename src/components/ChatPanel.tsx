@@ -41,6 +41,8 @@ export default function ChatPanel({
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const viewerId = typeof window !== "undefined" ? getViewerId() : "";
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0, scale: 1 });
 
   useEffect(() => {
     const saved = getViewerName();
@@ -142,17 +144,36 @@ export default function ChatPanel({
                 )}
               </div>
             </div>
-            {/* Card image */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={cardImage}
-              alt={cardPrompt || "Conversation card"}
-              className="w-full rounded-lg object-contain"
-              style={{
-                maxHeight: "240px",
-                filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.3))",
+            {/* Card image with 3D tilt */}
+            <div
+              ref={cardRef}
+              onMouseMove={(e) => {
+                const rect = cardRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                const x = (e.clientX - rect.left) / rect.width;
+                const y = (e.clientY - rect.top) / rect.height;
+                setTilt({
+                  rotateX: (0.5 - y) * 20,
+                  rotateY: (x - 0.5) * 20,
+                  scale: 1.03,
+                });
               }}
-            />
+              onMouseLeave={() => setTilt({ rotateX: 0, rotateY: 0, scale: 1 })}
+              style={{ perspective: "600px" }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={cardImage}
+                alt={cardPrompt || "Conversation card"}
+                className="w-full rounded-lg object-contain"
+                style={{
+                  maxHeight: "240px",
+                  transform: `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale(${tilt.scale})`,
+                  transition: "transform 0.15s ease-out",
+                  filter: `drop-shadow(${tilt.rotateY * -0.5}px ${tilt.rotateX * 0.5 + 6}px 20px rgba(0,0,0,0.4))`,
+                }}
+              />
+            </div>
           </div>
         )}
 
