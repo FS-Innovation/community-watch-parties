@@ -1,27 +1,80 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import gsap from "gsap";
 
-const SCREENING_CARDS = [
+// 2 cards per interest group — viewers get a mix-matched set of 4
+const CARDS_BY_SEGMENT: Record<string, { prompt: string; author: string; image: string }[]> = {
+  Reflection: [
+    { prompt: "When was the last time a day flew by and what were you doing?", author: "Payal Kadakia", image: "/cards/card-1-payal-kadakia.JPG" },
+    { prompt: "What are you clear about now that one year ago you didn't know?", author: "Chris Voss", image: "/cards/card-3-chris-voss.JPG" },
+  ],
+  Building: [
+    { prompt: "What did you learn from your greatest failure?", author: "Sir Richard Branson", image: "/cards/card-2-richard-branson.JPG" },
+    { prompt: "When was the last time you changed your mind about something life-changing?", author: "Africa Brooke", image: "/cards/card-4-africa-brooke.JPG" },
+  ],
+  Creativity: [
+    { prompt: "Do you think your younger self would be proud / look up to you now?", author: "Lewis Capaldi", image: "/cards/card-5-lewis-capaldi.JPG" },
+    { prompt: "When was the last time a day flew by and what were you doing?", author: "Payal Kadakia", image: "/cards/card-1-payal-kadakia.JPG" },
+  ],
+  Connection: [
+    { prompt: "When was the last time you changed your mind about something life-changing?", author: "Africa Brooke", image: "/cards/card-4-africa-brooke.JPG" },
+    { prompt: "What did you learn from your greatest failure?", author: "Sir Richard Branson", image: "/cards/card-2-richard-branson.JPG" },
+  ],
+};
+
+// All unique cards as fallback
+const ALL_CARDS = [
   { prompt: "When was the last time a day flew by and what were you doing?", author: "Payal Kadakia", image: "/cards/card-1-payal-kadakia.JPG" },
   { prompt: "What did you learn from your greatest failure?", author: "Sir Richard Branson", image: "/cards/card-2-richard-branson.JPG" },
   { prompt: "What are you clear about now that one year ago you didn't know?", author: "Chris Voss", image: "/cards/card-3-chris-voss.JPG" },
   { prompt: "When was the last time you changed your mind about something life-changing?", author: "Africa Brooke", image: "/cards/card-4-africa-brooke.JPG" },
-  { prompt: "Do you think your younger self would be proud / look up to you now?", author: "Lewis Capaldi", image: "/cards/card-5-lewis-capaldi.JPG" },
 ];
 
-const CARD_DURATION = 120; // 2 minutes per card
+const CARD_DURATION = 45; // ~45 seconds per card
 
 interface Props {
   eventId: string;
   viewerId: string;
+  segment?: string;
   onRespond?: (prompt: string, answer: string) => void;
   onAllDone?: () => void;
   onCardChange?: (prompt: string, author: string) => void;
 }
 
-export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone, onCardChange }: Props) {
+// Build a mix-matched deck: 2 cards from the viewer's segment + 2 from other groups
+function buildDeck(segment?: string) {
+  if (!segment || !CARDS_BY_SEGMENT[segment]) return ALL_CARDS;
+
+  const own = CARDS_BY_SEGMENT[segment];
+  const otherSegments = Object.keys(CARDS_BY_SEGMENT).filter(s => s !== segment);
+
+  // Pick 1 card from each of 2 other segments
+  const others: typeof own = [];
+  const shuffled = otherSegments.sort(() => Math.random() - 0.5);
+  for (const s of shuffled) {
+    if (others.length >= 2) break;
+    const pool = CARDS_BY_SEGMENT[s];
+    // Pick a card that isn't already in own
+    const pick = pool.find(c => !own.some(o => o.prompt === c.prompt));
+    if (pick) others.push(pick);
+  }
+
+  // Fill remaining if needed
+  while (others.length < 2) {
+    const remaining = ALL_CARDS.find(c =>
+      !own.some(o => o.prompt === c.prompt) && !others.some(o => o.prompt === c.prompt)
+    );
+    if (remaining) others.push(remaining);
+    else break;
+  }
+
+  // Interleave: own card, other card, own card, other card
+  return [own[0], others[0], own[1], others[1]].filter(Boolean);
+}
+
+export default function ScreeningCards({ eventId, viewerId, segment, onRespond, onAllDone, onCardChange }: Props) {
+  const deck = useMemo(() => buildDeck(segment), [segment]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(CARD_DURATION);
   const [allDone, setAllDone] = useState(false);
@@ -68,9 +121,9 @@ export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone
   // Notify parent of current card prompt (for chat context)
   useEffect(() => {
     if (allDone) return;
-    const card = SCREENING_CARDS[currentCardIndex];
-    onCardChange?.(card.prompt, card.author);
-  }, [currentCardIndex, allDone, onCardChange]);
+    const card = deck[currentCardIndex];
+    if (card) onCardChange?.(card.prompt, card.author);
+  }, [currentCardIndex, allDone, onCardChange, deck]);
 
   // 3D tilt on hover
   useEffect(() => {
@@ -103,7 +156,7 @@ export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone
   }, [currentCardIndex, allDone]);
 
   const advanceCard = () => {
-    if (currentCardIndex < SCREENING_CARDS.length - 1) {
+    if (currentCardIndex < deck.length - 1) {
       if (cardRef.current) {
         gsap.to(cardRef.current, {
           opacity: 0,
@@ -147,22 +200,24 @@ export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone
     );
   }
 
-  const card = SCREENING_CARDS[currentCardIndex];
+  const card = deck[currentCardIndex];
+  if (!card) return null;
+
   return (
     <div className="flex flex-col items-center justify-center h-full p-4" style={{ perspective: "1200px" }}>
       {/* Minimal progress — card count + timer */}
       <div className="mb-4 flex items-center gap-3 flex-shrink-0">
         <span className="text-[10px] tracking-[0.15em] uppercase text-[var(--room-text-muted)]">
-          Card {currentCardIndex + 1} of {SCREENING_CARDS.length}
+          Card {currentCardIndex + 1} of {deck.length}
         </span>
-        <span className={`text-[10px] font-mono ${timeLeft <= 15 ? "text-[var(--room-red)]" : "text-[var(--room-text-muted)]"}`}>
+        <span className={`text-[10px] font-mono ${timeLeft <= 10 ? "text-[var(--room-red)]" : "text-[var(--room-text-muted)]"}`}>
           {formatTime(timeLeft)}
         </span>
       </div>
 
       {/* Card dots */}
       <div className="flex gap-1.5 justify-center mb-4 flex-shrink-0">
-        {SCREENING_CARDS.map((_, i) => (
+        {deck.map((_, i) => (
           <div
             key={i}
             className={`w-1.5 h-1.5 rounded-full transition-all ${
