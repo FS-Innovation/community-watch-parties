@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getViewerId, getViewerName, setViewerName } from "@/lib/viewer";
+import Lenis from "lenis";
 
 interface ChatMessage {
   id: string;
@@ -25,7 +26,34 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline }: Props) 
   const [displayName, setDisplayName] = useState("");
   const [nameSet, setNameSet] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const lenisRef = useRef<Lenis | null>(null);
   const viewerId = typeof window !== "undefined" ? getViewerId() : "";
+
+  // Lenis smooth scroll for messages container
+  useEffect(() => {
+    if (!messagesContainerRef.current) return;
+
+    const lenis = new Lenis({
+      wrapper: messagesContainerRef.current,
+      content: messagesContainerRef.current.firstElementChild as HTMLElement || messagesContainerRef.current,
+      smoothWheel: true,
+      lerp: 0.08,
+    });
+    lenisRef.current = lenis;
+
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+    const frame = requestAnimationFrame(raf);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      lenis.destroy();
+      lenisRef.current = null;
+    };
+  }, [isOpen, inline]);
 
   useEffect(() => {
     const saved = getViewerName();
@@ -99,7 +127,7 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline }: Props) 
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-3 space-y-3">
           {messages.length === 0 && (
             <p className="text-xs text-[var(--room-text-muted)] text-center py-8">
               No messages yet. Say something...

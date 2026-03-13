@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getViewerName, setViewerName } from "@/lib/viewer";
+import gsap from "gsap";
 
 // DOAC Conversation Cards deck
 // Place card images at public/cards/ with the filenames below
@@ -46,6 +47,11 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
   const cardIndexRef = useRef(0);
   const answerRef = useRef("");
 
+  // GSAP refs
+  const cardContainerRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const prevCardIndex = useRef(-1);
+
   // Keep refs in sync
   useEffect(() => { responsesRef.current = responses; }, [responses]);
   useEffect(() => { cardIndexRef.current = currentCardIndex; }, [currentCardIndex]);
@@ -56,6 +62,130 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
     const saved = getViewerName();
     if (saved) setDisplayName(saved);
   }, []);
+
+  // ─── GSAP card entrance animation ───
+  useEffect(() => {
+    if (phase !== "cards" || !cardRef.current) return;
+
+    const direction = prevCardIndex.current < currentCardIndex ? 1 : -1;
+    prevCardIndex.current = currentCardIndex;
+
+    const el = cardRef.current;
+    const tl = gsap.timeline();
+
+    tl.fromTo(el, {
+      opacity: 0,
+      x: direction * 120,
+      rotateY: direction * 15,
+      scale: 0.92,
+      transformPerspective: 1200,
+    }, {
+      opacity: 1,
+      x: 0,
+      rotateY: 0,
+      scale: 1,
+      duration: 0.7,
+      ease: "power3.out",
+    });
+
+    // Stagger the inner elements for parallax feel
+    const image = el.querySelector(".card-image");
+    const prompt = el.querySelector(".card-prompt-text");
+    const inputArea = el.querySelector(".card-input-area");
+
+    if (image) {
+      tl.fromTo(image, {
+        y: 20,
+        opacity: 0,
+        scale: 1.05,
+      }, {
+        y: 0,
+        opacity: 1,
+        scale: 1,
+        duration: 0.5,
+        ease: "power2.out",
+      }, "-=0.5");
+    }
+
+    if (prompt) {
+      tl.fromTo(prompt, {
+        y: 15,
+        opacity: 0,
+      }, {
+        y: 0,
+        opacity: 1,
+        duration: 0.4,
+        ease: "power2.out",
+      }, "-=0.35");
+    }
+
+    if (inputArea) {
+      tl.fromTo(inputArea, {
+        y: 10,
+        opacity: 0,
+      }, {
+        y: 0,
+        opacity: 1,
+        duration: 0.35,
+        ease: "power2.out",
+      }, "-=0.25");
+    }
+
+    return () => { tl.kill(); };
+  }, [phase, currentCardIndex]);
+
+  // ─── 3D tilt on mouse move ───
+  useEffect(() => {
+    if (phase !== "cards" || !cardRef.current) return;
+
+    const el = cardRef.current;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = el.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width - 0.5;
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+
+      gsap.to(el, {
+        rotateY: x * 8,
+        rotateX: -y * 5,
+        transformPerspective: 1200,
+        duration: 0.4,
+        ease: "power2.out",
+      });
+
+      // Parallax inner image shift
+      const image = el.querySelector(".card-image") as HTMLElement;
+      if (image) {
+        gsap.to(image, {
+          x: x * -12,
+          y: y * -8,
+          duration: 0.4,
+          ease: "power2.out",
+        });
+      }
+    };
+
+    const handleMouseLeave = () => {
+      gsap.to(el, {
+        rotateY: 0,
+        rotateX: 0,
+        duration: 0.6,
+        ease: "power3.out",
+      });
+      const image = el.querySelector(".card-image") as HTMLElement;
+      if (image) {
+        gsap.to(image, { x: 0, y: 0, duration: 0.6, ease: "power3.out" });
+      }
+    };
+
+    el.addEventListener("mousemove", handleMouseMove);
+    el.addEventListener("mouseleave", handleMouseLeave);
+
+    return () => {
+      el.removeEventListener("mousemove", handleMouseMove);
+      el.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, [phase, currentCardIndex]);
 
   // Global countdown synced with server countdown
   useEffect(() => {
@@ -120,20 +250,47 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
     setResponses(newResponses);
     setAnswer("");
 
-    // Send to server
-    fetch("/api/icebreaker", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        event_id: eventId,
-        viewer_id: viewerId,
-        display_name: displayName,
-        prompt: card.prompt,
-        answer: answer.trim(),
-      }),
-    }).catch(() => {});
+    // GSAP exit animation before advancing
+    if (cardRef.current) {
+      gsap.to(cardRef.current, {
+        opacity: 0,
+        x: -80,
+        rotateY: -10,
+        scale: 0.95,
+        transformPerspective: 1200,
+        duration: 0.35,
+        ease: "power2.in",
+        onComplete: () => {
+          // Send to server
+          fetch("/api/icebreaker", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              event_id: eventId,
+              viewer_id: viewerId,
+              display_name: displayName,
+              prompt: card.prompt,
+              answer: answer.trim(),
+            }),
+          }).catch(() => {});
 
-    advanceCardWithResponses(newResponses);
+          advanceCardWithResponses(newResponses);
+        },
+      });
+    } else {
+      fetch("/api/icebreaker", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: eventId,
+          viewer_id: viewerId,
+          display_name: displayName,
+          prompt: card.prompt,
+          answer: answer.trim(),
+        }),
+      }).catch(() => {});
+      advanceCardWithResponses(newResponses);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answer, currentCardIndex, responses, eventId, viewerId, displayName]);
 
@@ -217,7 +374,7 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
   const bgDarkness = Math.min(0.85, countdownProgress * 0.85);
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center">
+    <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center" style={{ perspective: "1200px" }}>
       <AnimatePresence mode="wait">
         {/* ─── Name Entry ─── */}
         {phase === "name" && (
@@ -263,6 +420,7 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="flex items-center gap-8 max-w-4xl w-full mx-4"
+            ref={cardContainerRef}
           >
             {/* Left: Global countdown */}
             <div className="flex-shrink-0 text-center w-28">
@@ -301,28 +459,21 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
                 {ICEBREAKER_CARDS.map((_, i) => (
                   <div
                     key={i}
-                    className={`w-2 h-2 rounded-full transition-colors ${
+                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
                       i < currentCardIndex
-                        ? "bg-[var(--room-accent)]"
+                        ? "bg-[var(--room-accent)] scale-100"
                         : i === currentCardIndex
-                        ? "bg-[var(--room-gold)]"
-                        : "bg-[var(--room-surface)]"
+                        ? "bg-[var(--room-gold)] scale-125"
+                        : "bg-[var(--room-surface)] scale-100"
                     }`}
                   />
                 ))}
               </div>
             </div>
 
-            {/* Center: Card */}
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`card-${currentCardIndex}`}
-                initial={{ opacity: 0, x: 40 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -40 }}
-                transition={{ duration: 0.35 }}
-                className="flex-1"
-              >
+            {/* Center: Card with GSAP 3D */}
+            <div className="flex-1" style={{ transformStyle: "preserve-3d" }}>
+              <div ref={cardRef} key={`card-${currentCardIndex}`} style={{ transformStyle: "preserve-3d" }}>
                 {/* Card timer bar */}
                 <div className="mb-4">
                   <div className="flex items-center justify-between text-[10px] text-[var(--room-text-muted)] mb-1.5">
@@ -334,33 +485,31 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
                     </span>
                   </div>
                   <div className="h-1 bg-[var(--room-surface)] rounded-full overflow-hidden">
-                    <motion.div
-                      className={`h-full rounded-full ${cardTimeLeft <= 10 ? "bg-[var(--room-red)]" : "bg-[var(--room-accent)]"}`}
+                    <div
+                      className={`h-full rounded-full transition-all duration-1000 linear ${cardTimeLeft <= 10 ? "bg-[var(--room-red)]" : "bg-[var(--room-accent)]"}`}
                       style={{ width: `${100 - cardProgress}%` }}
-                      transition={{ duration: 0.3 }}
                     />
                   </div>
                 </div>
 
-                {/* The card itself — image + input */}
-                <div className="icebreaker-card overflow-hidden">
-                  {/* Card image */}
-                  <div className="relative w-full" style={{ maxHeight: "360px" }}>
+                {/* The card itself — image + input with 3D depth */}
+                <div className="icebreaker-card overflow-hidden" style={{ transformStyle: "preserve-3d" }}>
+                  {/* Card image with parallax */}
+                  <div className="relative w-full card-image overflow-hidden" style={{ maxHeight: "360px" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={card.image}
                       alt={`${card.author}: ${card.prompt}`}
                       className="w-full h-auto object-contain"
-                      style={{ maxHeight: "360px" }}
+                      style={{ maxHeight: "360px", willChange: "transform" }}
                       onError={(e) => {
-                        // Fallback to text if image not found
                         (e.target as HTMLImageElement).style.display = "none";
                         const fallback = (e.target as HTMLImageElement).nextElementSibling;
                         if (fallback) (fallback as HTMLElement).style.display = "block";
                       }}
                     />
                     {/* Text fallback (hidden by default, shown if image fails) */}
-                    <div className="p-8 text-center" style={{ display: "none" }}>
+                    <div className="card-prompt-text p-8 text-center" style={{ display: "none" }}>
                       <p className="text-[9px] tracking-[0.25em] uppercase text-[var(--room-text-muted)] mb-6">
                         The Diary of a CEO Conversation Cards
                       </p>
@@ -374,7 +523,7 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
                   </div>
 
                   {/* Input area */}
-                  <div className="p-6 space-y-3">
+                  <div className="card-input-area p-6 space-y-3">
                     <input
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
@@ -393,8 +542,22 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
                       </button>
                       <button
                         onClick={() => {
-                          setAnswer("");
-                          advanceCard();
+                          if (cardRef.current) {
+                            gsap.to(cardRef.current, {
+                              opacity: 0,
+                              x: -60,
+                              rotateY: -8,
+                              duration: 0.3,
+                              ease: "power2.in",
+                              onComplete: () => {
+                                setAnswer("");
+                                advanceCard();
+                              },
+                            });
+                          } else {
+                            setAnswer("");
+                            advanceCard();
+                          }
                         }}
                         className="btn-ghost text-sm px-4"
                       >
@@ -403,8 +566,8 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            </AnimatePresence>
+              </div>
+            </div>
           </motion.div>
         )}
 
