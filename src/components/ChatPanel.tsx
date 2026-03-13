@@ -106,7 +106,10 @@ export default function ChatPanel({
     const showCard = cardImage && (phase === "warmup" || phase === "arrival");
 
     return (
-      <div className="relative flex flex-col h-full w-full overflow-hidden bg-white">
+      <div
+        className="relative flex flex-col h-full w-full overflow-hidden"
+        style={{ background: "#1e2030" }}
+      >
         {/* Left edge accent line */}
         <div
           className="absolute top-0 left-0 bottom-0 w-[2px] pointer-events-none"
@@ -116,24 +119,24 @@ export default function ChatPanel({
         {/* Room name header */}
         {roomName && (
           <div className="flex-shrink-0 px-4 pt-4 pb-2">
-            <h2 className="text-sm font-semibold text-gray-900">{roomName}</h2>
+            <h2 className="text-sm font-semibold text-white/90">{roomName}</h2>
           </div>
         )}
 
         {/* Card image — hero content at top of chat */}
         {showCard && (
-          <div className="flex-shrink-0 p-4 pb-2 border-b border-gray-100">
+          <div className="flex-shrink-0 p-4 pb-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
             {/* Card count + timer */}
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] tracking-[0.2em] uppercase font-semibold text-violet-600">
+              <span className="text-[9px] tracking-[0.2em] uppercase font-semibold" style={{ color: "#a78bfa" }}>
                 Break the ice
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] text-gray-400 tracking-wider uppercase">
+                <span className="text-[9px] text-white/35 tracking-wider uppercase">
                   {cardIndex + 1} of {totalCards}
                 </span>
                 {cardTimeLeft > 0 && totalCards > 1 && cardIndex < totalCards - 1 && (
-                  <span className="text-[9px] text-gray-400 font-mono">
+                  <span className="text-[9px] text-white/25 font-mono">
                     next in {formatTime(cardTimeLeft)}
                   </span>
                 )}
@@ -147,7 +150,7 @@ export default function ChatPanel({
               className="w-full rounded-lg object-contain"
               style={{
                 maxHeight: "240px",
-                filter: "drop-shadow(0 2px 12px rgba(0,0,0,0.1))",
+                filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.3))",
               }}
             />
           </div>
@@ -155,11 +158,13 @@ export default function ChatPanel({
 
         {/* Text fallback if no image but has prompt */}
         {!showCard && cardPrompt && (
-          <div className="flex-shrink-0 px-4 py-3 border-b border-gray-100 bg-violet-50">
-            <p className="text-[9px] tracking-[0.2em] uppercase font-semibold mb-1.5 text-violet-600">
+          <div className="flex-shrink-0 px-4 py-3"
+            style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(167,139,250,0.06)" }}
+          >
+            <p className="text-[9px] tracking-[0.2em] uppercase font-semibold mb-1.5" style={{ color: "#a78bfa" }}>
               Break the ice
             </p>
-            <p className="text-[13px] text-gray-700 leading-relaxed font-medium italic">
+            <p className="text-[13px] text-white/75 leading-relaxed font-medium italic">
               &ldquo;{cardPrompt}&rdquo;
             </p>
           </div>
@@ -169,8 +174,8 @@ export default function ChatPanel({
         <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-6 gap-2">
-              <p className="text-sm text-gray-400">No messages yet</p>
-              <p className="text-xs text-gray-300">Be the first to say something</p>
+              <p className="text-sm text-white/40">No messages yet</p>
+              <p className="text-xs text-white/25">Be the first to say something</p>
             </div>
           )}
           {messages.map((msg) => (
@@ -178,13 +183,17 @@ export default function ChatPanel({
               key={msg.id}
               className={`text-sm ${msg.viewer_id === viewerId ? "text-right" : ""}`}
             >
-              <span className="text-[10px] text-gray-400">{msg.display_name}</span>
+              <span className="text-[10px] text-white/40">{msg.display_name}</span>
               <div
                 className={`mt-0.5 inline-block px-3 py-2 rounded-xl text-[13px] max-w-[85%] ${
                   msg.viewer_id === viewerId
-                    ? "rounded-br-sm text-white bg-violet-500"
-                    : "rounded-bl-sm text-gray-800 bg-gray-100"
+                    ? "rounded-br-sm text-white"
+                    : "rounded-bl-sm text-white/85"
                 }`}
+                style={msg.viewer_id === viewerId
+                  ? { background: "rgba(124,92,252,0.35)", border: "1px solid rgba(124,92,252,0.25)" }
+                  : { background: "rgba(255,255,255,0.08)" }
+                }
               >
                 {msg.text}
               </div>
@@ -194,7 +203,9 @@ export default function ChatPanel({
         </div>
 
         {/* Input */}
-        <div className="relative p-3 border-t border-gray-100 flex-shrink-0 bg-gray-50/80">
+        <div className="relative p-3 flex-shrink-0"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
+        >
           {!nameSet && (
             <input
               value={displayName}
@@ -206,7 +217,10 @@ export default function ChatPanel({
                   setTimeout(() => inputRef.current?.focus(), 50);
                 }
               }}
-              className="w-full px-3 py-3 rounded-xl text-sm mb-2 outline-none transition-all text-gray-900 placeholder:text-gray-400 bg-white border border-gray-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+              className="w-full px-3 py-3 rounded-xl text-sm mb-2 outline-none transition-all text-white placeholder:text-white/35"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(124,92,252,0.5)"; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
               placeholder="Enter your name to chat..."
               autoFocus
             />
@@ -217,18 +231,22 @@ export default function ChatPanel({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              className="flex-1 px-3 py-3 rounded-xl text-sm outline-none transition-all text-gray-900 placeholder:text-gray-400 disabled:opacity-30 bg-white border border-gray-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+              className="flex-1 px-3 py-3 rounded-xl text-sm outline-none transition-all text-white placeholder:text-white/35 disabled:opacity-25"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(124,92,252,0.5)"; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
               placeholder={nameSet ? (cardPrompt ? "Share your thoughts..." : "Type a message...") : "Set your name first..."}
               disabled={!nameSet}
             />
             <button
               onClick={sendMessage}
               disabled={!input.trim() || !nameSet}
-              className={`px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-25 disabled:cursor-not-allowed ${
-                input.trim() && nameSet
-                  ? "bg-violet-500 text-white hover:bg-violet-600"
-                  : "bg-gray-100 text-gray-400 border border-gray-200"
-              }`}
+              className="px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+              style={{
+                background: input.trim() && nameSet ? "rgba(124,92,252,0.4)" : "rgba(255,255,255,0.07)",
+                color: input.trim() && nameSet ? "white" : "rgba(255,255,255,0.4)",
+                border: `1px solid ${input.trim() && nameSet ? "rgba(124,92,252,0.35)" : "rgba(255,255,255,0.1)"}`,
+              }}
             >
               Send
             </button>
