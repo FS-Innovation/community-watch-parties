@@ -231,8 +231,8 @@ export default function Room() {
 
   return (
     <main className="h-screen w-screen flex flex-col overflow-hidden bg-[var(--room-bg)]">
-      {/* Cinema Curtains — only during screening room transition */}
-      {segmentComplete && <CinemaCurtains isOpen={curtainsOpen} />}
+      {/* Cinema Curtains — dramatic open on arrival, never re-close during pre-show */}
+      <CinemaCurtains isOpen={arrived} />
 
       {/* Spotlight reveal overlay */}
       <AnimatePresence>
