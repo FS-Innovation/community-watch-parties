@@ -30,6 +30,21 @@ export default function PreShowExperience({
   const [silenceCardVisible, setSilenceCardVisible] = useState(false);
   const [silenceCardShown, setSilenceCardShown] = useState(false);
   const [skippedToCards, setSkippedToCards] = useState(false);
+  const [ambientIndex, setAmbientIndex] = useState(0);
+
+  const ambientMessages = useMemo(() => {
+    if (timeLeft > 300) return [
+      "Grab your snacks, we're starting soon",
+      "Find your comfiest spot",
+      "Who's watching from bed? No judgment",
+    ];
+    if (timeLeft > 120) return [
+      "The show is starting soon...",
+      "Say hi in the chat",
+      "Almost showtime",
+    ];
+    return ["Almost time..."];
+  }, [timeLeft > 300, timeLeft > 120]);
 
   // Countdown tick
   useEffect(() => {
@@ -91,6 +106,15 @@ export default function PreShowExperience({
   // Show cards during warmup, or during arrival if user skipped
   const showCards = phase === "warmup" || (phase === "arrival" && skippedToCards);
   const showArrival = phase === "arrival" && !skippedToCards;
+
+  // Rotate ambient messages
+  useEffect(() => {
+    if (!showCards) return;
+    const interval = setInterval(() => {
+      setAmbientIndex((i) => i + 1);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [showCards]);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center">
@@ -161,19 +185,19 @@ export default function PreShowExperience({
                   />
                 </div>
 
-                {/* Ambient message during warmup */}
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 3, delay: 1 }}
-                  className="text-sm text-[var(--room-text-muted)] opacity-40 tracking-wide"
-                >
-                  {timeLeft > 300
-                    ? "Grab your snacks, we're starting soon"
-                    : timeLeft > 120
-                      ? "The show is starting soon..."
-                      : "Almost time..."}
-                </motion.p>
+                {/* Ambient message during warmup — rotates every 8s */}
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={ambientMessages[ambientIndex % ambientMessages.length]}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 0.4 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 2 }}
+                    className="text-sm text-[var(--room-text-muted)] tracking-wide"
+                  >
+                    {ambientMessages[ambientIndex % ambientMessages.length]}
+                  </motion.p>
+                </AnimatePresence>
               </div>
             )}
 
