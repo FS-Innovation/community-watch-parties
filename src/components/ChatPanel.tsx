@@ -187,14 +187,23 @@ export default function ChatPanel({
           </div>
         )}
 
-        {/* Text fallback if no image but has prompt */}
-        {!showCard && cardPrompt && (
+        {/* Text fallback if no image but has prompt — only during arrival/warmup */}
+        {!showCard && cardPrompt && (phase === "warmup" || phase === "arrival") && (
           <div className="flex-shrink-0 px-4 py-3">
             <p className="text-[9px] tracking-[0.2em] uppercase font-semibold mb-1.5" style={{ color: "#a78bfa" }}>
               Break the ice
             </p>
             <p className="text-[13px] text-white/75 leading-relaxed font-medium italic">
               &ldquo;{cardPrompt}&rdquo;
+            </p>
+          </div>
+        )}
+
+        {/* Whisper hint during build/silence */}
+        {(phase === "build" || phase === "silence") && (
+          <div className="flex-shrink-0 px-4 pt-3 pb-1">
+            <p className="text-[10px] tracking-[0.15em] uppercase text-white/20 text-center">
+              Whisper to your group
             </p>
           </div>
         )}
@@ -258,7 +267,7 @@ export default function ChatPanel({
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
               className="w-full px-4 py-3 pr-16 rounded-2xl text-sm outline-none transition-all text-white placeholder:text-white/30 disabled:opacity-25 border-none"
               style={{ background: "rgba(255,255,255,0.06)" }}
-              placeholder={nameSet ? (cardPrompt ? "Share your thoughts..." : "Type a message...") : "Set your name first..."}
+              placeholder={nameSet ? ((phase === "build" || phase === "silence") ? "Whisper..." : cardPrompt ? "Share your thoughts..." : "Type a message...") : "Set your name first..."}
               disabled={!nameSet}
             />
             <button
