@@ -291,7 +291,7 @@ export default function Room() {
             </div>
           )}
           {eventStatus === "countdown" && (
-            <span className="text-xs text-[var(--room-gold)]">{PHASE_LABELS[preshowPhase]}</span>
+            <span className="text-xs text-[var(--room-gold)]">Pre-show</span>
           )}
           {eventStatus === "waiting" && (
             <span className="text-xs text-[var(--room-text-muted)]">Starting...</span>
