@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ScreeningCards from "@/components/ScreeningCards";
-import PresenceCounter from "@/components/PresenceCounter";
 import { getPreShowPhase, PHASE_LABELS } from "@/lib/preshow";
 import type { PreShowPhase } from "@/lib/types";
 
@@ -30,6 +29,7 @@ export default function PreShowExperience({
   const [fullscreenDismissed, setFullscreenDismissed] = useState(false);
   const [silenceCardVisible, setSilenceCardVisible] = useState(false);
   const [silenceCardShown, setSilenceCardShown] = useState(false);
+  const [skippedToCards, setSkippedToCards] = useState(false);
 
   // Countdown tick
   useEffect(() => {
@@ -82,15 +82,15 @@ export default function PreShowExperience({
   }, []);
 
   // Phase-driven background opacity for the giant countdown
-  const countdownOpacity = phase === "arrival" ? 0.04 : phase === "warmup" ? 0.06 : phase === "build" ? 0.12 : 0;
+  const countdownOpacity = phase === "arrival" && !skippedToCards ? 0.04 : phase === "warmup" || skippedToCards ? 0.06 : phase === "build" ? 0.12 : 0;
   const countdownScale = phase === "build" ? 1.1 : 1;
 
   // During silence + curtain, override all content
   const showSilenceOverlay = phase === "silence" || phase === "curtain";
 
-  // Show cards during warmup, atmosphere during arrival
-  const showCards = phase === "warmup";
-  const showArrival = phase === "arrival";
+  // Show cards during warmup, or during arrival if user skipped
+  const showCards = phase === "warmup" || (phase === "arrival" && skippedToCards);
+  const showArrival = phase === "arrival" && !skippedToCards;
 
   return (
     <div className="relative w-full h-full flex items-center justify-center">
@@ -129,13 +129,13 @@ export default function PreShowExperience({
       <AnimatePresence mode="wait">
         {!showSilenceOverlay ? (
           <motion.div
-            key={showCards ? "cards" : "arrival"}
+            key={showCards ? "cards" : showArrival ? "arrival" : "build"}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.8 } }}
             className="relative z-[5] w-full h-full flex items-center justify-center"
           >
-            {/* ─── Arrival Phase: Atmospheric countdown + presence ─── */}
+            {/* ─── Arrival Phase: Welcome + "I'm ready" button ─── */}
             {showArrival && (
               <div className="text-center">
                 <motion.div
@@ -148,9 +148,15 @@ export default function PreShowExperience({
                     Community Screening
                   </p>
                   <h1 className="text-2xl font-bold mb-3">Take your seat</h1>
-                  <p className="text-sm text-[var(--room-text-secondary)] max-w-md mx-auto">
-                    The screening begins shortly. Settle in and say hello in the chat.
+                  <p className="text-sm text-[var(--room-text-secondary)] max-w-md mx-auto mb-8">
+                    The screening begins shortly. Say hello in the chat while you wait.
                   </p>
+                  <button
+                    onClick={() => setSkippedToCards(true)}
+                    className="btn-accent text-sm py-3 px-8"
+                  >
+                    I&apos;m ready
+                  </button>
                 </motion.div>
 
                 {/* Countdown pill */}
@@ -158,7 +164,7 @@ export default function PreShowExperience({
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: 1 }}
+                    transition={{ delay: 1.2 }}
                     className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)] mx-auto w-fit"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
@@ -169,7 +175,7 @@ export default function PreShowExperience({
               </div>
             )}
 
-            {/* ─── Warmup Phase: Conversation Cards ─── */}
+            {/* ─── Cards Phase (warmup or skipped arrival) ─── */}
             {showCards && (
               <div className="w-full max-w-2xl mx-auto flex flex-col h-full px-4">
                 {/* Countdown pill */}
@@ -194,7 +200,7 @@ export default function PreShowExperience({
             )}
 
             {/* ─── Build Phase: Anticipation, screen simplifies ─── */}
-            {phase === "build" && (
+            {phase === "build" && !showCards && (
               <div className="text-center">
                 <motion.div
                   initial={{ opacity: 0 }}
