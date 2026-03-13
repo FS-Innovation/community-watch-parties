@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { HostLayout } from "@/lib/types";
+import type { HostLayout, PreShowPhase } from "@/lib/types";
+import { PHASE_LABELS } from "@/lib/preshow";
 
 interface Props {
   eventId: string;
@@ -13,11 +14,12 @@ interface Props {
   hostLayout: HostLayout;
   hostVisible: boolean;
   onSyncUpdate: () => void;
+  preshowPhase?: PreShowPhase;
 }
 
 export default function HostControlsPanel({
   eventId, isOpen, onToggle, eventStatus, curtainsOpen,
-  hostLayout, hostVisible, onSyncUpdate,
+  hostLayout, hostVisible, onSyncUpdate, preshowPhase,
 }: Props) {
   const [playbackId, setPlaybackId] = useState("");
   const [seekTime, setSeekTime] = useState("0");
@@ -75,6 +77,27 @@ export default function HostControlsPanel({
                 ))}
               </div>
             </div>
+
+            {/* Pre-Show Phase */}
+            {eventStatus === "countdown" && preshowPhase && (
+              <div className="flex-shrink-0">
+                <label className="text-[9px] text-[var(--room-text-muted)] uppercase tracking-wider block mb-1.5">Phase</label>
+                <div className="flex gap-1">
+                  {(["arrival", "warmup", "build", "silence"] as const).map((p) => (
+                    <span
+                      key={p}
+                      className={`px-2 py-1 rounded text-[10px] capitalize ${
+                        preshowPhase === p
+                          ? "bg-[var(--room-gold)] text-black font-medium"
+                          : "bg-[var(--room-surface)] text-[var(--room-text-muted)]"
+                      }`}
+                    >
+                      {PHASE_LABELS[p]}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Curtains */}
             <div className="flex-shrink-0">

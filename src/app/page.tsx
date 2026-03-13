@@ -8,11 +8,12 @@ import HostCameraLayer from "@/components/HostCameraLayer";
 import ConversationCardOverlay from "@/components/ConversationCardOverlay";
 import ChatPanel from "@/components/ChatPanel";
 import CinemaCurtains from "@/components/CinemaCurtains";
-import CommunitySegmentFlow from "@/components/CommunitySegmentFlow";
+import PreShowExperience from "@/components/PreShowExperience";
 import PresenceCounter from "@/components/PresenceCounter";
 import ThemeToggle from "@/components/ThemeToggle";
 import HostControlsPanel from "@/components/HostControlsPanel";
-import type { SyncState, ConversationCard, HostLayout, ReactionEmoji } from "@/lib/types";
+import type { SyncState, ConversationCard, HostLayout, ReactionEmoji, PreShowPhase } from "@/lib/types";
+import { PHASE_LABELS } from "@/lib/preshow";
 import { getViewerId } from "@/lib/viewer";
 
 const DEMO_EVENT_ID = "demo-event";
@@ -35,6 +36,7 @@ export default function Room() {
   const [hostPanelOpen, setHostPanelOpen] = useState(true); // Everyone is a host for now
   const [arrived, setArrived] = useState(false); // tracks curtain reveal
   const [currentCardPrompt, setCurrentCardPrompt] = useState<string | null>(null);
+  const [preshowPhase, setPreshowPhase] = useState<PreShowPhase>("arrival");
   const shownCardIds = useRef<Set<string>>(new Set());
   const autoStartedRef = useRef(false);
 
@@ -214,6 +216,10 @@ export default function Room() {
     setCurrentCardPrompt(prompt);
   }, []);
 
+  const handlePhaseChange = useCallback((phase: PreShowPhase) => {
+    setPreshowPhase(phase);
+  }, []);
+
   const handleReaction = useCallback((emoji: ReactionEmoji) => {
     fetch("/api/reactions", {
       method: "POST",
@@ -268,7 +274,7 @@ export default function Room() {
             </div>
           )}
           {eventStatus === "countdown" && (
-            <span className="text-xs text-[var(--room-gold)]">Pre-show</span>
+            <span className="text-xs text-[var(--room-gold)]">{PHASE_LABELS[preshowPhase]}</span>
           )}
           {eventStatus === "waiting" && (
             <span className="text-xs text-[var(--room-text-muted)]">Starting...</span>
@@ -330,17 +336,18 @@ export default function Room() {
       {/* ─── Main Content ─── */}
       <div className="flex flex-col flex-1 min-h-0">
         {!segmentComplete ? (
-          /* ─── Pre-show: Community Segmentation + Conversation Cards ─── */
+          /* ─── Pre-show: Phase-driven experience ─── */
           <div className="flex flex-1 min-h-0">
-            {/* Center: segmentation flow → conversation cards */}
-            <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
-              <CommunitySegmentFlow
+            {/* Center: phase-driven pre-show (questions → cards → build → silence → curtain) */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <PreShowExperience
                 eventId={eventId}
                 viewerId={viewerId}
                 countdownStart={countdownStart}
                 countdownDuration={countdownDuration}
                 onComplete={handleSegmentComplete}
                 onCardChange={handleCardPromptChange}
+                onPhaseChange={handlePhaseChange}
               />
             </div>
             {/* Right: Chat (always available) */}
@@ -418,6 +425,7 @@ export default function Room() {
         hostLayout={hostLayout}
         hostVisible={hostVisible}
         onSyncUpdate={poll}
+        preshowPhase={preshowPhase}
       />
     </main>
   );

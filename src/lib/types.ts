@@ -62,3 +62,7 @@ export type ReactionEmoji = typeof REACTIONS[number]['emoji'];
 // ─── Host Camera Layout ───
 
 export type HostLayout = 'pip' | 'side';
+
+// ─── Pre-Show Phases ───
+
+export type PreShowPhase = 'arrival' | 'warmup' | 'build' | 'silence' | 'curtain' | 'live';
