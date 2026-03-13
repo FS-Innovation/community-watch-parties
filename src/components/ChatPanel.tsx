@@ -106,16 +106,25 @@ export default function ChatPanel({
   // Inline mode: card + chat combined
   if (inline) {
     const showCard = cardImage && (phase === "warmup" || phase === "arrival");
+    const isDimmed = phase === "silence";
 
     return (
       <div
-        className="relative flex flex-col h-full w-full overflow-hidden"
-        style={{ background: "linear-gradient(165deg, #1a1a2e 0%, #0f0f17 55%, #12121e 100%)" }}
+        className="relative flex flex-col h-full w-full overflow-hidden transition-all duration-[2000ms]"
+        style={{
+          background: isDimmed
+            ? "linear-gradient(165deg, #0e0e18 0%, #08080d 55%, #0a0a12 100%)"
+            : "linear-gradient(165deg, #1a1a2e 0%, #0f0f17 55%, #12121e 100%)",
+          opacity: isDimmed ? 0.6 : 1,
+        }}
       >
         {/* Left edge accent — faded glow instead of hard line */}
         <div
-          className="absolute top-0 left-0 bottom-0 w-[1px] pointer-events-none"
-          style={{ background: "linear-gradient(180deg, transparent 0%, rgba(167,139,250,0.25) 30%, rgba(167,139,250,0.15) 70%, transparent 100%)" }}
+          className="absolute top-0 left-0 bottom-0 w-[1px] pointer-events-none transition-opacity duration-[2000ms]"
+          style={{
+            background: "linear-gradient(180deg, transparent 0%, rgba(167,139,250,0.25) 30%, rgba(167,139,250,0.15) 70%, transparent 100%)",
+            opacity: isDimmed ? 0.3 : 1,
+          }}
         />
 
         {/* Room name header */}
