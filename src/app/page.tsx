@@ -36,6 +36,11 @@ export default function Room() {
   const [hostPanelOpen, setHostPanelOpen] = useState(true); // Everyone is a host for now
   const [arrived, setArrived] = useState(false); // tracks curtain reveal
   const [currentCardPrompt, setCurrentCardPrompt] = useState<string | null>(null);
+  const [currentCardImage, setCurrentCardImage] = useState<string | null>(null);
+  const [currentCardAuthor, setCurrentCardAuthor] = useState<string | null>(null);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [totalCards, setTotalCards] = useState(0);
+  const [cardTimeLeft, setCardTimeLeft] = useState(0);
   const [preshowPhase, setPreshowPhase] = useState<PreShowPhase>("arrival");
   const shownCardIds = useRef<Set<string>>(new Set());
   const autoStartedRef = useRef(false);
@@ -213,8 +218,13 @@ export default function Room() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const handleCardPromptChange = useCallback((prompt: string) => {
+  const handleCardPromptChange = useCallback((prompt: string, author: string, image: string, index: number, total: number, timeLeft: number) => {
     setCurrentCardPrompt(prompt);
+    setCurrentCardAuthor(author);
+    setCurrentCardImage(image);
+    setCurrentCardIndex(index);
+    setTotalCards(total);
+    setCardTimeLeft(timeLeft);
   }, []);
 
   const handlePhaseChange = useCallback((phase: PreShowPhase) => {
@@ -384,7 +394,19 @@ export default function Room() {
                   className="flex-shrink-0 border-l border-white/[0.06] flex flex-col overflow-hidden relative z-10"
                   style={{ height: "100%" }}
                 >
-                  <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline cardPrompt={currentCardPrompt} phase={preshowPhase} />
+                  <ChatPanel
+                    eventId={eventId}
+                    isOpen={true}
+                    onToggle={() => setChatOpen(false)}
+                    inline
+                    cardPrompt={currentCardPrompt}
+                    cardImage={currentCardImage}
+                    cardAuthor={currentCardAuthor}
+                    cardIndex={currentCardIndex}
+                    totalCards={totalCards}
+                    cardTimeLeft={cardTimeLeft}
+                    phase={preshowPhase}
+                  />
                 </motion.div>
               )}
             </AnimatePresence>

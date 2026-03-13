@@ -29,7 +29,7 @@ interface Props {
   viewerId: string;
   room?: string;
   onAllDone?: () => void;
-  onCardChange?: (prompt: string, author: string) => void;
+  onCardChange?: (prompt: string, author: string, image: string, index: number, total: number, timeLeft: number) => void;
 }
 
 export default function ScreeningCards({ eventId, viewerId, room = "builder", onAllDone, onCardChange }: Props) {
@@ -77,12 +77,12 @@ export default function ScreeningCards({ eventId, viewerId, room = "builder", on
     });
   }, [currentCardIndex, allDone]);
 
-  // Notify parent of current card prompt (for chat context)
+  // Notify parent of current card data (for chat context)
   useEffect(() => {
     if (allDone) return;
     const card = SCREENING_CARDS[currentCardIndex];
-    onCardChange?.(card.prompt, card.author);
-  }, [currentCardIndex, allDone, onCardChange]);
+    onCardChange?.(card.prompt, card.author, card.image, currentCardIndex, SCREENING_CARDS.length, timeLeft);
+  }, [currentCardIndex, timeLeft, allDone, onCardChange]);
 
   // 3D tilt on hover
   useEffect(() => {

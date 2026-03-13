@@ -155,8 +155,8 @@ export default function HostControlsPanel({
                       sendSync({ playback_id: playbackId.trim() });
                     }
                   }}
-                  className="w-40 px-1.5 py-1 rounded text-[10px] bg-[var(--room-surface)] text-[var(--room-text)] border border-[var(--room-border)]"
-                  placeholder="Mux playback ID"
+                  className="w-64 px-1.5 py-1 rounded text-[10px] bg-[var(--room-surface)] text-[var(--room-text)] border border-[var(--room-border)] font-mono"
+                  placeholder="Mux playback ID (not asset ID)"
                 />
                 <button
                   onClick={() => playbackId.trim() && sendSync({ playback_id: playbackId.trim() })}

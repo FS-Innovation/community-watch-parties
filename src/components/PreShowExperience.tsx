@@ -12,7 +12,7 @@ interface Props {
   countdownStart: number | null;
   countdownDuration: number;
   onComplete: () => void;
-  onCardChange?: (prompt: string, author: string) => void;
+  onCardChange?: (prompt: string, author: string, image: string, index: number, total: number, timeLeft: number) => void;
   onPhaseChange?: (phase: PreShowPhase) => void;
 }
 
@@ -175,21 +175,19 @@ export default function PreShowExperience({
               </div>
             )}
 
-            {/* ─── Cards Phase (warmup or skipped arrival) ─── */}
+            {/* ─── Cards Phase (warmup or skipped arrival) — card image moved to chat panel ─── */}
             {showCards && (
-              <div className="w-full max-w-2xl mx-auto flex flex-col h-full px-4">
+              <div className="flex flex-col items-center justify-center h-full">
                 {/* Countdown pill */}
-                <div className="flex flex-col items-center gap-2 py-4 flex-shrink-0">
-                  {countdownStart && timeLeft > 0 && (
-                    <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
-                      <span className="text-sm font-mono font-medium text-[var(--room-text)]">{formatTime(timeLeft)}</span>
-                      <span className="text-[10px] text-[var(--room-text-muted)] tracking-wider uppercase">until screening</span>
-                    </div>
-                  )}
-                </div>
-                {/* Cards */}
-                <div className="flex-1 min-h-0">
+                {countdownStart && timeLeft > 0 && (
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
+                    <span className="text-sm font-mono font-medium text-[var(--room-text)]">{formatTime(timeLeft)}</span>
+                    <span className="text-[10px] text-[var(--room-text-muted)] tracking-wider uppercase">until screening</span>
+                  </div>
+                )}
+                {/* ScreeningCards still runs (hidden) to drive the timer + card change callbacks */}
+                <div className="hidden">
                   <ScreeningCards
                     eventId={eventId}
                     viewerId={viewerId}
