@@ -219,23 +219,20 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
 
   const currentQuestion = SEGMENTATION_QUESTIONS[currentStep];
 
-  // ─── Conversation cards phase (full-screen) ───
+  // ─── Conversation cards phase ───
   if (phase === "cards") {
     return (
-      <div className="w-full h-full flex flex-col">
-        {/* Countdown pill at top */}
-        {countdownStart && globalTimeLeft > 0 && (
-          <div className="flex justify-center py-3 flex-shrink-0">
+      <div className="w-full max-w-2xl mx-auto flex flex-col h-full px-4">
+        {/* Countdown pill + segment badge */}
+        <div className="flex flex-col items-center gap-2 py-4 flex-shrink-0">
+          {countdownStart && globalTimeLeft > 0 && (
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--room-surface)] border border-[var(--room-border)]">
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--room-gold)]" style={{ animation: "pulse-dot 1.5s infinite" }} />
               <span className="text-sm font-mono font-medium text-[var(--room-text)]">{formatTime(globalTimeLeft)}</span>
               <span className="text-[10px] text-[var(--room-text-muted)] tracking-wider uppercase">until screening</span>
             </div>
-          </div>
-        )}
-        {/* Segment badge */}
-        {assignedSegment && (
-          <div className="flex items-center justify-center gap-2 pb-2 flex-shrink-0">
+          )}
+          {assignedSegment && (
             <span className="text-[10px] tracking-[0.15em] uppercase text-[var(--room-text-muted)]">
               {assignedSegment === "Reflection" && "🪞"}
               {assignedSegment === "Building" && "🔨"}
@@ -243,8 +240,8 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
               {assignedSegment === "Connection" && "🤝"}
               {" "}{assignedSegment} Room
             </span>
-          </div>
-        )}
+          )}
+        </div>
         {/* Cards */}
         <div className="flex-1 min-h-0">
           <ScreeningCards
