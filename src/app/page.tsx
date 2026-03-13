@@ -54,6 +54,7 @@ export default function Room() {
       if (data.countdown_start) setCountdownStart(data.countdown_start);
       if (data.countdown_duration) setCountdownDuration(data.countdown_duration);
       if (data.curtains_open !== undefined) setCurtainsOpen(data.curtains_open);
+      if (data.playback_id) setPlaybackId(data.playback_id);
     } catch { /* ignore */ }
   }, [eventId]);
 
@@ -308,8 +309,8 @@ export default function Room() {
         <div className="flex items-center gap-3">
           <PresenceCounter eventId={eventId} />
           <ThemeToggle />
-          {/* Camera toggle — everyone can go on stage */}
-          {segmentComplete && (
+          {/* Camera toggle — reserved for Q&A phase */}
+          {false && (
             <button
               onClick={() => setHostVisible(!hostVisible)}
               className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
@@ -399,9 +400,6 @@ export default function Room() {
                   syncState={syncState}
                   onTimeUpdate={setCurrentTime}
                 />
-                {hostLayout === "pip" && (
-                  <HostCameraLayer layout="pip" visible={hostVisible} />
-                )}
                 <ReactionBar onReaction={handleReaction} />
               </div>
             </div>
@@ -422,12 +420,7 @@ export default function Room() {
               )}
             </AnimatePresence>
 
-            {/* Host side panel */}
-            {hostLayout === "side" && hostVisible && (
-              <div className="w-80 lg:w-96 flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] p-3">
-                <HostCameraLayer layout="side" visible={true} />
-              </div>
-            )}
+            {/* Host side panel — reserved for Q&A phase (not during live screening) */}
           </div>
         )}
       </div>

@@ -13,6 +13,7 @@ interface RoomState {
   countdown_start: number | null;    // epoch ms when countdown was triggered
   countdown_duration: number;         // countdown duration in seconds (default 300 = 5 min)
   curtains_open: boolean;             // admin toggle for curtains
+  playback_id: string | null;         // Mux playback ID set from host controls
 }
 
 const rooms: Record<string, RoomState> = {};
@@ -28,10 +29,11 @@ function getRoom(eventId: string): RoomState {
       },
       event_status: "waiting",
       host_layout: "pip",
-      host_visible: true,
+      host_visible: false,
       countdown_start: null,
       countdown_duration: 900,
       curtains_open: false,
+      playback_id: null,
     };
   }
   return rooms[eventId];
@@ -50,6 +52,7 @@ export async function GET(request: NextRequest) {
     countdown_start: room.countdown_start,
     countdown_duration: room.countdown_duration,
     curtains_open: room.curtains_open,
+    playback_id: room.playback_id,
   });
 }
 
@@ -113,6 +116,10 @@ export async function POST(request: NextRequest) {
 
   if (body.host_visible !== undefined) {
     room.host_visible = body.host_visible;
+  }
+
+  if (body.playback_id !== undefined) {
+    room.playback_id = body.playback_id;
   }
 
   // In production: broadcast this to all clients via Supabase Realtime

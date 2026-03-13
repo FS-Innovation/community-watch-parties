@@ -146,12 +146,25 @@ export default function HostControlsPanel({
             {/* Mux Playback ID */}
             <div className="flex-shrink-0">
               <label className="text-[9px] text-[var(--room-text-muted)] uppercase tracking-wider block mb-1.5">Playback ID</label>
-              <input
-                value={playbackId}
-                onChange={(e) => setPlaybackId(e.target.value)}
-                className="w-40 px-1.5 py-1 rounded text-[10px] bg-[var(--room-surface)] text-[var(--room-text)] border border-[var(--room-border)]"
-                placeholder="Mux playback ID"
-              />
+              <div className="flex gap-1 items-center">
+                <input
+                  value={playbackId}
+                  onChange={(e) => setPlaybackId(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && playbackId.trim()) {
+                      sendSync({ playback_id: playbackId.trim() });
+                    }
+                  }}
+                  className="w-40 px-1.5 py-1 rounded text-[10px] bg-[var(--room-surface)] text-[var(--room-text)] border border-[var(--room-border)]"
+                  placeholder="Mux playback ID"
+                />
+                <button
+                  onClick={() => playbackId.trim() && sendSync({ playback_id: playbackId.trim() })}
+                  className="px-2 py-1 rounded text-[10px] bg-[var(--room-accent)] text-white"
+                >
+                  Set
+                </button>
+              </div>
             </div>
 
             {/* Host Camera */}
