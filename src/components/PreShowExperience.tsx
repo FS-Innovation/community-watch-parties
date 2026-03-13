@@ -284,30 +284,15 @@ export default function PreShowExperience({
         )}
       </AnimatePresence>
 
-      {/* ─── Build phase: subtle background darkening ─── */}
-      <AnimatePresence>
-        {phase === "build" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.3 }}
-            exit={{ opacity: 0, transition: { duration: 1 } }}
-            className="absolute inset-0 pointer-events-none z-[1]"
-            style={{
-              background: "radial-gradient(ellipse 70% 80% at center, transparent 0%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0.7) 100%)",
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* ─── Silence phase: darker background ─── */}
+      {/* ─── Silence phase: lights dim only in the last ~30s ─── */}
       <AnimatePresence>
         {showSilenceOverlay && (
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 5 }}
+            animate={{ opacity: 0.6 }}
+            transition={{ duration: 3 }}
             className="absolute inset-0 pointer-events-none z-[1]"
-            style={{ background: "rgba(0,0,0,0.5)" }}
+            style={{ background: "rgba(0,0,0,0.7)" }}
           />
         )}
       </AnimatePresence>
