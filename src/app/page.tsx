@@ -380,10 +380,10 @@ export default function Room() {
                   animate={{ width: 384, opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden relative z-10"
+                  className="flex-shrink-0 border-l border-white/[0.06] flex flex-col overflow-hidden relative z-10"
                   style={{ height: "100%" }}
                 >
-                  <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline cardPrompt={currentCardPrompt} />
+                  <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline cardPrompt={currentCardPrompt} phase={preshowPhase} />
                 </motion.div>
               )}
             </AnimatePresence>
