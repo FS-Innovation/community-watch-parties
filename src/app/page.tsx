@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import VideoPlayer from "@/components/VideoPlayer";
 import ReactionBar from "@/components/ReactionBar";
 import HostCameraLayer from "@/components/HostCameraLayer";
@@ -26,12 +27,13 @@ export default function Room() {
   const [hostLayout, setHostLayout] = useState<HostLayout>("pip");
   const [hostVisible, setHostVisible] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true); // Chat open by default
   const [curtainsOpen, setCurtainsOpen] = useState(false);
   const [icebreakerComplete, setIcebreakerComplete] = useState(false);
   const [countdownStart, setCountdownStart] = useState<number | null>(null);
   const [countdownDuration, setCountdownDuration] = useState(DEFAULT_COUNTDOWN);
   const [hostPanelOpen, setHostPanelOpen] = useState(false);
+  const [arrived, setArrived] = useState(false); // tracks curtain reveal
   const shownCardIds = useRef<Set<string>>(new Set());
   const autoStartedRef = useRef(false);
 
@@ -89,6 +91,23 @@ export default function Room() {
       }).then(() => poll()).catch(() => {});
     }
   }, [eventStatus, eventId, poll]);
+
+  // ─── Auto-open curtains on arrive (brief dramatic delay) ───
+  useEffect(() => {
+    if (arrived) return;
+    // Brief 1.5s delay for dramatic reveal, then open curtains
+    const timer = setTimeout(() => {
+      setArrived(true);
+      setCurtainsOpen(true);
+      // Also tell the server curtains are open
+      fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_id: eventId, curtains_open: true }),
+      }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [arrived, eventId]);
 
   // ─── Late joiner: skip icebreaker if already live/ended ───
   useEffect(() => {
@@ -207,22 +226,27 @@ export default function Room() {
 
   return (
     <main className="h-screen w-screen flex flex-col overflow-hidden bg-[var(--room-bg)]">
-      {/* Icebreaker + Countdown (unified pre-show) */}
-      {!icebreakerComplete && (
-        <IcebreakerFlow
-          eventId={eventId}
-          viewerId={viewerId}
-          countdownStart={countdownStart}
-          countdownDuration={countdownDuration}
-          onComplete={handleIcebreakerComplete}
-        />
-      )}
-
-      {/* Cinema Curtains */}
+      {/* Cinema Curtains — auto-open on arrive */}
       <CinemaCurtains isOpen={curtainsOpen} />
 
+      {/* Spotlight reveal overlay */}
+      <AnimatePresence>
+        {arrived && !icebreakerComplete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.8 } }}
+            transition={{ duration: 1.5, delay: 0.3 }}
+            className="fixed inset-0 z-[50] pointer-events-none"
+            style={{
+              background: "radial-gradient(ellipse 60% 70% at center, transparent 0%, rgba(5,5,5,0.6) 60%, rgba(2,2,2,0.85) 100%)",
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* ─── Top Bar ─── */}
-      <header className="flex items-center justify-between px-5 py-3 flex-shrink-0 bg-[var(--room-bg)] border-b border-[var(--room-border)]">
+      <header className="flex items-center justify-between px-5 py-3 flex-shrink-0 bg-[var(--room-bg)] border-b border-[var(--room-border)] z-[40]">
         <div className="flex items-center gap-3">
           <span className="text-xs tracking-[0.15em] uppercase text-[var(--room-accent)] font-semibold">
             DOAC Screening
@@ -246,6 +270,19 @@ export default function Room() {
         <div className="flex items-center gap-3">
           <PresenceCounter eventId={eventId} />
           <ThemeToggle />
+          <button
+            onClick={() => setChatOpen(!chatOpen)}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+              chatOpen
+                ? "bg-[var(--room-accent)] text-white"
+                : "bg-[var(--room-surface)] text-[var(--room-text-muted)] hover:text-[var(--room-text)]"
+            }`}
+            title="Toggle Chat"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </button>
           {/* Host controls toggle */}
           <button
             onClick={() => setHostPanelOpen(!hostPanelOpen)}
@@ -266,23 +303,59 @@ export default function Room() {
 
       {/* ─── Main Content ─── */}
       <div className="flex flex-1 min-h-0">
-        {/* Video + Reactions */}
-        <div className="flex-1 flex flex-col p-4 min-w-0">
-          <div className="relative flex-1 min-h-0">
-            <VideoPlayer
-              playbackId={playbackId}
-              syncState={syncState}
-              onTimeUpdate={setCurrentTime}
-            />
-            {hostLayout === "pip" && (
-              <HostCameraLayer layout="pip" visible={hostVisible} />
-            )}
-            <ReactionBar onReaction={handleReaction} />
-          </div>
+        {/* Center stage: pre-show icebreaker OR video */}
+        <div className="flex-1 flex flex-col min-w-0 relative">
+          {!icebreakerComplete ? (
+            /* ─── Pre-show: Icebreaker in center ─── */
+            <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
+              <IcebreakerFlow
+                eventId={eventId}
+                viewerId={viewerId}
+                countdownStart={countdownStart}
+                countdownDuration={countdownDuration}
+                onComplete={handleIcebreakerComplete}
+              />
+            </div>
+          ) : (
+            /* ─── Live: Video + Reactions ─── */
+            <div className="flex-1 flex flex-col p-4 min-w-0">
+              <div className="relative flex-1 min-h-0">
+                <VideoPlayer
+                  playbackId={playbackId}
+                  syncState={syncState}
+                  onTimeUpdate={setCurrentTime}
+                />
+                {hostLayout === "pip" && (
+                  <HostCameraLayer layout="pip" visible={hostVisible} />
+                )}
+                <ReactionBar onReaction={handleReaction} />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Host side panel */}
-        {hostLayout === "side" && hostVisible && (
+        {/* Right side: Chat panel (always-available side panel) */}
+        <AnimatePresence>
+          {chatOpen && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 384, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden"
+            >
+              <ChatPanel
+                eventId={eventId}
+                isOpen={true}
+                onToggle={() => setChatOpen(false)}
+                inline
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Host side panel (when in side layout mode during live) */}
+        {hostLayout === "side" && hostVisible && icebreakerComplete && (
           <div className="w-80 lg:w-96 flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] p-3">
             <HostCameraLayer layout="side" visible={true} />
           </div>
@@ -294,13 +367,6 @@ export default function Room() {
         card={activeCard}
         onRespond={handleCardRespond}
         onDismiss={handleCardDismiss}
-      />
-
-      {/* Chat Panel */}
-      <ChatPanel
-        eventId={eventId}
-        isOpen={chatOpen}
-        onToggle={() => setChatOpen(!chatOpen)}
       />
 
       {/* Host Controls Panel (collapsible) */}

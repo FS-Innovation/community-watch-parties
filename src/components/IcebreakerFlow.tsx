@@ -217,9 +217,7 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
   const bgDarkness = Math.min(0.85, countdownProgress * 0.85);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center" style={{
-      background: `radial-gradient(ellipse at center, rgba(10, 10, 10, ${0.92 + bgDarkness * 0.08}) 0%, rgba(5, 5, 5, ${0.95 + bgDarkness * 0.05}) 100%)`,
-    }}>
+    <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center">
       <AnimatePresence mode="wait">
         {/* ─── Name Entry ─── */}
         {phase === "name" && (
