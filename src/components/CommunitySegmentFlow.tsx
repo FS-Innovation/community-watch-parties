@@ -6,7 +6,7 @@ import { getViewerName, setViewerName } from "@/lib/viewer";
 import gsap from "gsap";
 import ScreeningCards from "@/components/ScreeningCards";
 
-// 3 quick questions — just enough to match people, not enough to feel like a survey
+// 3 quick questions — just enough to find their crew, not enough to feel like a survey
 const SEGMENTATION_QUESTIONS = [
   {
     id: "motivation",
@@ -45,6 +45,13 @@ const SEGMENTATION_QUESTIONS = [
   },
 ];
 
+const SEGMENT_MESSAGES: Record<string, string> = {
+  Reflection: "You're headed to the Reflection room — you'll be watching with others who like to go deep and sit with the big questions.",
+  Building: "You're headed to the Building room — you'll be alongside other makers and builders who are creating something new.",
+  Creativity: "You're headed to the Creativity room — you'll be with fellow creatives who are drawn to ideas and inspiration.",
+  Connection: "You're headed to the Connection room — you'll be with people who bring the energy and love meeting new people.",
+};
+
 interface Props {
   eventId: string;
   viewerId: string;
@@ -66,7 +73,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [responses, setResponses] = useState<SegmentResponse[]>([]);
   const [globalTimeLeft, setGlobalTimeLeft] = useState(countdownDuration);
-  const [phase, setPhase] = useState<"name" | "questions" | "processing" | "ready" | "picking" | "cards">("name");
+  const [phase, setPhase] = useState<"name" | "questions" | "ready" | "picking" | "cards">("name");
   const [assignedSegment, setAssignedSegment] = useState<string | null>(null);
   const [placementMessage, setPlacementMessage] = useState<string | null>(null);
   const [presenceCount, setPresenceCount] = useState(0);
@@ -190,33 +197,16 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
         setCurrentStep((i) => i + 1);
       }
     } else {
-      // All done — process and send to AI matchmaking
-      setPhase("processing");
-      processSegmentation(allResponses);
+      // All done — derive segment from the user's explicit vibe pick
+      const segmentResponse = allResponses.find(r => r.questionId === "segment");
+      const picked = Array.isArray(segmentResponse?.answer)
+        ? segmentResponse.answer[0]
+        : segmentResponse?.answer?.split(",")[0]?.trim();
+      const segment = picked || "Connection";
+      setAssignedSegment(segment);
+      setPlacementMessage(SEGMENT_MESSAGES[segment] || `You're headed to the ${segment} room — ready?`);
+      setPhase("ready");
     }
-  };
-
-  const processSegmentation = async (allResponses: SegmentResponse[]) => {
-    try {
-      const res = await fetch("/api/matchmaking", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event_id: eventId,
-          viewer_id: viewerId,
-          display_name: displayName,
-          responses: allResponses.map(r => ({
-            prompt: SEGMENTATION_QUESTIONS.find(q => q.id === r.questionId)?.question || "",
-            answer: Array.isArray(r.answer) ? r.answer.join(", ") : r.answer,
-          })),
-        }),
-      });
-      const data = await res.json();
-      if (data.segment) setAssignedSegment(data.segment);
-      if (data.placement_message) setPlacementMessage(data.placement_message);
-    } catch { /* continue anyway */ }
-
-    setPhase("ready");
   };
 
   const toggleOption = (label: string) => {
@@ -261,6 +251,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
           <ScreeningCards
             eventId={eventId}
             viewerId={viewerId}
+            segment={assignedSegment || undefined}
             onAllDone={onComplete}
             onCardChange={onCardChange}
           />
@@ -295,7 +286,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
             </p>
             <h1 className="text-2xl font-bold mb-2">Find Your People</h1>
             <p className="text-sm text-[var(--room-text-secondary)] mb-2">
-              3 quick questions and we&apos;ll seat you with people on your wavelength. You&apos;ll watch together, chat together, and actually connect.
+              3 quick questions and we&apos;ll find your crew. You&apos;ll watch together, chat together, and actually connect.
             </p>
             {presenceCount > 1 && (
               <p className="text-xs text-[var(--room-text-muted)] mb-8">
@@ -425,28 +416,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
           </motion.div>
         )}
 
-        {/* ─── Processing ─── */}
-        {phase === "processing" && (
-          <motion.div
-            key="processing"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="text-center max-w-md"
-          >
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-              className="w-12 h-12 mx-auto mb-4 rounded-full border-2 border-[var(--room-accent)] border-t-transparent"
-            />
-            <p className="text-lg font-medium mb-2">Finding your crew</p>
-            <p className="text-sm text-[var(--room-text-secondary)]">
-              Matching you with people on your wavelength...
-            </p>
-          </motion.div>
-        )}
-
-        {/* ─── Ready: Conversational AI placement ─── */}
+        {/* ─── Ready: Segment placement ─── */}
         {phase === "ready" && (
           <motion.div
             key="ready"
@@ -479,7 +449,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
               </motion.div>
             )}
 
-            {/* AI conversational message */}
+            {/* Placement message */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

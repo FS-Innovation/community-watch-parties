@@ -17,7 +17,7 @@ import { PHASE_LABELS } from "@/lib/preshow";
 import { getViewerId } from "@/lib/viewer";
 
 const DEMO_EVENT_ID = "demo-event";
-const DEFAULT_COUNTDOWN = 900; // 15 minutes (5 min questions + 10 min conversation cards)
+const DEFAULT_COUNTDOWN = 600; // 10 minutes (3 min questions + 3 min cards + 3 min build + 1 min silence)
 
 export default function Room() {
   const [eventId] = useState(DEMO_EVENT_ID);
@@ -334,7 +334,7 @@ export default function Room() {
       </header>
 
       {/* ─── Main Content ─── */}
-      <div className="flex flex-col flex-1 min-h-0">
+      <div className={`flex flex-col flex-1 min-h-0 transition-[padding] ${hostPanelOpen ? "pb-[72px]" : ""}`}>
         {!segmentComplete ? (
           /* ─── Pre-show: Phase-driven experience ─── */
           <div className="flex flex-1 min-h-0">

@@ -58,16 +58,6 @@ create table if not exists icebreaker_responses (
   created_at timestamp with time zone default now()
 );
 
--- ─── AI Matches ───
-create table if not exists ai_matches (
-  id uuid default uuid_generate_v4() primary key,
-  event_id uuid references events(id) on delete cascade,
-  viewer_id_1 text not null,
-  viewer_id_2 text not null,
-  match_reason text,
-  created_at timestamp with time zone default now()
-);
-
 -- ─── Indexes ───
 create index if not exists idx_cards_event on conversation_cards(event_id);
 create index if not exists idx_cards_trigger on conversation_cards(trigger_time_seconds);
@@ -77,16 +67,12 @@ create index if not exists idx_chat_event on chat_messages(event_id);
 create index if not exists idx_chat_created on chat_messages(created_at);
 create index if not exists idx_icebreaker_event on icebreaker_responses(event_id);
 create index if not exists idx_icebreaker_viewer on icebreaker_responses(viewer_id);
-create index if not exists idx_matches_event on ai_matches(event_id);
-
 -- ─── Row Level Security ───
 alter table events enable row level security;
 alter table conversation_cards enable row level security;
 alter table card_responses enable row level security;
 alter table chat_messages enable row level security;
 alter table icebreaker_responses enable row level security;
-alter table ai_matches enable row level security;
-
 -- Public read for events, cards, chat
 create policy "anon_read_events" on events for select using (true);
 create policy "anon_read_cards" on conversation_cards for select using (true);
@@ -97,15 +83,11 @@ create policy "anon_insert_responses" on card_responses for insert with check (t
 create policy "anon_insert_chat" on chat_messages for insert with check (true);
 create policy "anon_read_icebreaker" on icebreaker_responses for select using (true);
 create policy "anon_insert_icebreaker" on icebreaker_responses for insert with check (true);
-create policy "anon_read_matches" on ai_matches for select using (true);
-
 -- Service role full access
 create policy "service_events" on events for all using (auth.role() = 'service_role');
 create policy "service_cards" on conversation_cards for all using (auth.role() = 'service_role');
 create policy "service_responses" on card_responses for all using (auth.role() = 'service_role');
 create policy "service_chat" on chat_messages for all using (auth.role() = 'service_role');
 create policy "service_icebreaker" on icebreaker_responses for all using (auth.role() = 'service_role');
-create policy "service_matches" on ai_matches for all using (auth.role() = 'service_role');
-
 -- Enable realtime for chat
 alter publication supabase_realtime add table chat_messages;
