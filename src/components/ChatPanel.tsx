@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getViewerId, getViewerName, setViewerName } from "@/lib/viewer";
-import Lenis from "lenis";
 
 interface ChatMessage {
   id: string;
@@ -27,34 +26,8 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
   const [displayName, setDisplayName] = useState("");
   const [nameSet, setNameSet] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const lenisRef = useRef<Lenis | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const viewerId = typeof window !== "undefined" ? getViewerId() : "";
-
-  // Lenis smooth scroll for messages container
-  useEffect(() => {
-    if (!messagesContainerRef.current) return;
-
-    const lenis = new Lenis({
-      wrapper: messagesContainerRef.current,
-      content: messagesContainerRef.current.firstElementChild as HTMLElement || messagesContainerRef.current,
-      smoothWheel: true,
-      lerp: 0.08,
-    });
-    lenisRef.current = lenis;
-
-    function raf(time: number) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
-    }
-    const frame = requestAnimationFrame(raf);
-
-    return () => {
-      cancelAnimationFrame(frame);
-      lenis.destroy();
-      lenisRef.current = null;
-    };
-  }, [isOpen, inline]);
 
   useEffect(() => {
     const saved = getViewerName();
@@ -113,7 +86,7 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
   // Inline mode: renders as a flex column filling parent container
   if (inline) {
     return (
-      <div className="flex flex-col flex-1 w-96 min-h-0 overflow-hidden">
+      <div className="relative flex flex-col h-full w-full overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b border-[var(--room-border)] flex items-center justify-between flex-shrink-0">
           <div>
@@ -138,7 +111,7 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
         )}
 
         {/* Messages */}
-        <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
           {messages.length === 0 && (
             <p className="text-xs text-[var(--room-text-muted)] text-center py-8">
               No messages yet. Say something...
@@ -164,28 +137,37 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
           <div ref={bottomRef} />
         </div>
 
-        {/* Input */}
-        <div className="p-3 border-t border-[var(--room-border)] flex-shrink-0 space-y-2">
+        {/* Input — always visible at bottom */}
+        <div className="p-3 border-t border-[var(--room-border)] flex-shrink-0 bg-[var(--room-bg)]">
           {!nameSet && (
             <input
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="room-input text-xs"
-              placeholder="Your name"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && displayName.trim()) {
+                  setViewerName(displayName);
+                  setNameSet(true);
+                  setTimeout(() => inputRef.current?.focus(), 50);
+                }
+              }}
+              className="room-input text-xs mb-2"
+              placeholder="Enter your name to chat..."
+              autoFocus
             />
           )}
           <div className="flex gap-2">
             <input
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
               className="room-input flex-1 text-xs"
-              placeholder={cardPrompt ? "Share your thoughts..." : "Type a message..."}
-              autoFocus
+              placeholder={nameSet ? (cardPrompt ? "Share your thoughts..." : "Type a message...") : "Set your name first..."}
+              disabled={!nameSet}
             />
             <button
               onClick={sendMessage}
-              disabled={!input.trim() || !displayName.trim()}
+              disabled={!input.trim() || !nameSet}
               className="btn-accent text-xs px-3"
             >
               Send
