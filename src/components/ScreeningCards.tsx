@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import gsap from "gsap";
 
-// All conversation cards by room
+// 5 conversation cards total — each room sees only their 2
 const ROOM_CARDS: Record<string, { prompt: string; author: string; image: string }[]> = {
   builder: [
     { prompt: "When was the last time a day flew by and what were you doing?", author: "Payal Kadakia", image: "/cards/card-1-payal-kadakia.JPG" },
@@ -18,18 +18,11 @@ const ROOM_CARDS: Record<string, { prompt: string; author: string; image: string
   ],
 };
 
-// Builder room: 2 own cards + 2 mix-matched from other rooms + 1 wild card = 5
 function getCardsForRoom(room: string) {
-  const own = ROOM_CARDS[room] || ROOM_CARDS.builder;
-  const others = Object.entries(ROOM_CARDS)
-    .filter(([key]) => key !== room)
-    .flatMap(([, cards]) => cards);
-  // Take 2 own + up to 3 from others to reach 5
-  const mixCards = others.slice(0, 5 - own.length);
-  return [...own, ...mixCards];
+  return ROOM_CARDS[room] || ROOM_CARDS.builder;
 }
 
-const CARD_DURATION = 36; // ~36 seconds per card (5 cards × 36s = 3 min warmup phase)
+const CARD_DURATION = 90; // ~90 seconds per card (2 cards × 90s = 3 min warmup phase)
 
 interface Props {
   eventId: string;
