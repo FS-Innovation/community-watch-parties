@@ -33,15 +33,16 @@ const SEGMENTATION_QUESTIONS = [
     signal: "community segment",
   },
   {
-    id: "routing",
-    question: "Would you want to meet people near you, people like you, or just stay in the global screening experience for now?",
-    type: "single-select" as const,
+    id: "future_screenings",
+    question: "What types of screenings would you love more of in the future?",
+    type: "multi-select" as const,
     options: [
-      { label: "People near me", emoji: "📍", description: "Local to your city" },
-      { label: "People like me", emoji: "✨", description: "Similar interests & segment" },
-      { label: "Global room", emoji: "🌍", description: "Stay in the main experience" },
+      { label: "Founder stories", emoji: "🚀", description: "Startup journeys & lessons" },
+      { label: "Creative deep-dives", emoji: "🎬", description: "Art, film, music, design" },
+      { label: "Mental health & growth", emoji: "🌱", description: "Wellbeing & self-development" },
+      { label: "Live conversations", emoji: "🎙️", description: "Real-time Q&A with guests" },
     ],
-    signal: "routing preference",
+    signal: "content preference",
   },
 ];
 
@@ -66,6 +67,8 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
   const [responses, setResponses] = useState<SegmentResponse[]>([]);
   const [globalTimeLeft, setGlobalTimeLeft] = useState(countdownDuration);
   const [phase, setPhase] = useState<"name" | "questions" | "processing" | "ready">("name");
+  const [assignedSegment, setAssignedSegment] = useState<string | null>(null);
+  const [matchResult, setMatchResult] = useState<{ name: string; reason: string } | null>(null);
   const stepRef = useRef<HTMLDivElement>(null);
 
   // Load saved name
@@ -180,7 +183,7 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
 
   const processSegmentation = async (allResponses: SegmentResponse[]) => {
     try {
-      await fetch("/api/matchmaking", {
+      const res = await fetch("/api/matchmaking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -193,21 +196,18 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
           })),
         }),
       });
+      const data = await res.json();
+      if (data.segment) setAssignedSegment(data.segment);
+      if (data.match) setMatchResult({ name: data.match.name, reason: data.match.reason });
     } catch { /* continue anyway */ }
 
-    // Brief pause then show ready state
-    setTimeout(() => setPhase("ready"), 1500);
+    setPhase("ready");
   };
 
   const toggleOption = (label: string) => {
-    const q = SEGMENTATION_QUESTIONS[currentStep];
-    if (q.type === "single-select") {
-      setSelectedOptions([label]);
-    } else {
-      setSelectedOptions(prev =>
-        prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
-      );
-    }
+    setSelectedOptions(prev =>
+      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+    );
   };
 
   const formatTime = (seconds: number) => {
@@ -390,7 +390,7 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
           </motion.div>
         )}
 
-        {/* ─── Ready ─── */}
+        {/* ─── Ready: Show AI-assigned segment ─── */}
         {phase === "ready" && (
           <motion.div
             key="ready"
@@ -403,6 +403,33 @@ export default function IcebreakerFlow({ eventId, viewerId, countdownStart, coun
               You&apos;re all set
             </p>
             <h2 className="text-xl font-bold mb-2">Welcome, {displayName}</h2>
+
+            {/* AI-assigned interest group */}
+            {assignedSegment && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mb-5 p-4 rounded-xl bg-[var(--room-surface)] border border-[var(--room-border)]"
+              >
+                <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-text-muted)] mb-2">
+                  Your interest group
+                </p>
+                <p className="text-lg font-semibold text-[var(--room-text)]">
+                  {assignedSegment === "Reflection" && "🪞 "}
+                  {assignedSegment === "Building" && "🔨 "}
+                  {assignedSegment === "Creativity" && "🎨 "}
+                  {assignedSegment === "Connection" && "🤝 "}
+                  {assignedSegment}
+                </p>
+                {matchResult && (
+                  <p className="text-xs text-[var(--room-text-secondary)] mt-2 leading-relaxed">
+                    Matched with <span className="font-medium text-[var(--room-text)]">{matchResult.name}</span> — {matchResult.reason}
+                  </p>
+                )}
+              </motion.div>
+            )}
+
             <p className="text-sm text-[var(--room-text-secondary)] mb-6">
               {globalTimeLeft > 0
                 ? `The screening starts in ${formatTime(globalTimeLeft)}. Get comfortable.`

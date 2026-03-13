@@ -17,7 +17,7 @@ import type { SyncState, ConversationCard, HostLayout, ReactionEmoji } from "@/l
 import { getViewerId } from "@/lib/viewer";
 
 const DEMO_EVENT_ID = "demo-event";
-const DEFAULT_COUNTDOWN = 300; // 5 minutes
+const DEFAULT_COUNTDOWN = 900; // 15 minutes (5 min questions + 10 min conversation cards)
 
 export default function Room() {
   const [eventId] = useState(DEMO_EVENT_ID);
@@ -110,9 +110,14 @@ export default function Room() {
     return () => clearTimeout(timer);
   }, [arrived, eventId]);
 
-  // ─── Late joiner: skip icebreaker if already live/ended ───
+  // ─── Late joiner: skip icebreaker only if event was already live on first load ───
+  const initialStatusRef = useRef<string | null>(null);
   useEffect(() => {
-    if (eventStatus === "live" || eventStatus === "ended") {
+    if (initialStatusRef.current === null && eventStatus !== "waiting") {
+      initialStatusRef.current = eventStatus;
+    }
+    // Only skip icebreaker if the event was already live/ended when we FIRST loaded
+    if (initialStatusRef.current === "live" || initialStatusRef.current === "ended") {
       setIcebreakerComplete(true);
     }
   }, [eventStatus]);
