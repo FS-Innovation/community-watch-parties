@@ -15,11 +15,12 @@ interface Props {
   hostVisible: boolean;
   onSyncUpdate: () => void;
   preshowPhase?: PreShowPhase;
+  onPhaseSkip?: (phase: PreShowPhase) => void;
 }
 
 export default function HostControlsPanel({
   eventId, isOpen, onToggle, eventStatus, curtainsOpen,
-  hostLayout, hostVisible, onSyncUpdate, preshowPhase,
+  hostLayout, hostVisible, onSyncUpdate, preshowPhase, onPhaseSkip,
 }: Props) {
   const [playbackId, setPlaybackId] = useState("");
   const [seekTime, setSeekTime] = useState("0");
@@ -78,22 +79,23 @@ export default function HostControlsPanel({
               </div>
             </div>
 
-            {/* Pre-Show Phase */}
+            {/* Pre-Show Phase — click to skip */}
             {eventStatus === "countdown" && preshowPhase && (
               <div className="flex-shrink-0">
-                <label className="text-[9px] text-[var(--room-text-muted)] uppercase tracking-wider block mb-1.5">Phase</label>
+                <label className="text-[9px] text-[var(--room-text-muted)] uppercase tracking-wider block mb-1.5">Phase (click to skip)</label>
                 <div className="flex gap-1">
                   {(["arrival", "warmup", "build", "silence"] as const).map((p) => (
-                    <span
+                    <button
                       key={p}
-                      className={`px-2 py-1 rounded text-[10px] capitalize ${
+                      onClick={() => onPhaseSkip?.(p)}
+                      className={`px-2 py-1 rounded text-[10px] capitalize transition-colors ${
                         preshowPhase === p
                           ? "bg-[var(--room-gold)] text-black font-medium"
-                          : "bg-[var(--room-surface)] text-[var(--room-text-muted)]"
+                          : "bg-[var(--room-surface)] text-[var(--room-text-muted)] hover:text-[var(--room-text)] hover:bg-[var(--room-surface-hover)]"
                       }`}
                     >
                       {PHASE_LABELS[p]}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>

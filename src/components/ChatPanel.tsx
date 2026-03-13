@@ -113,7 +113,7 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPromp
   // Inline mode: renders as a flex column filling parent container
   if (inline) {
     return (
-      <div className="flex flex-col h-full w-96 min-h-0">
+      <div className="flex flex-col h-full w-96 min-h-0 max-h-full overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b border-[var(--room-border)] flex items-center justify-between flex-shrink-0">
           <div>

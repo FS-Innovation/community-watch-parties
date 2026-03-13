@@ -98,6 +98,11 @@ export async function POST(request: NextRequest) {
     room.event_status = body.event_status;
   }
 
+  // Allow direct countdown_start override (for host phase skipping)
+  if (body.countdown_start !== undefined) {
+    room.countdown_start = body.countdown_start;
+  }
+
   if (body.curtains_open !== undefined) {
     room.curtains_open = body.curtains_open;
   }

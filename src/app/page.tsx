@@ -220,6 +220,28 @@ export default function Room() {
     setPreshowPhase(phase);
   }, []);
 
+  // Host: skip to a specific pre-show phase by adjusting countdown_start
+  // Phase boundaries (time remaining): arrival=500s, warmup=330s, build=150s, silence=30s
+  const handlePhaseSkip = useCallback((targetPhase: PreShowPhase) => {
+    const phaseTimeLeft: Record<string, number> = {
+      arrival: 500,  // 8:20 remaining (middle of arrival)
+      warmup: 330,   // 5:30 remaining (middle of warmup)
+      build: 150,    // 2:30 remaining (middle of build)
+      silence: 30,   // 0:30 remaining (middle of silence)
+    };
+    const targetTimeLeft = phaseTimeLeft[targetPhase] ?? 300;
+    // countdownStart = now - (duration - targetTimeLeft) * 1000
+    const newCountdownStart = Date.now() - (countdownDuration - targetTimeLeft) * 1000;
+    setCountdownStart(newCountdownStart);
+
+    // Persist to server so it sticks across polls
+    fetch("/api/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_id: eventId, countdown_start: newCountdownStart }),
+    }).then(() => poll()).catch(() => {});
+  }, [countdownDuration, eventId, poll]);
+
   const handleReaction = useCallback((emoji: ReactionEmoji) => {
     fetch("/api/reactions", {
       method: "POST",
@@ -334,7 +356,7 @@ export default function Room() {
       </header>
 
       {/* ─── Main Content ─── */}
-      <div className={`flex flex-col flex-1 min-h-0 transition-[padding] ${hostPanelOpen ? "pb-[72px]" : ""}`}>
+      <div className={`flex flex-col flex-1 min-h-0 transition-[padding] ${hostPanelOpen ? "pb-[100px]" : ""}`}>
         {!segmentComplete ? (
           /* ─── Pre-show: Phase-driven experience ─── */
           <div className="flex flex-1 min-h-0">
@@ -358,7 +380,7 @@ export default function Room() {
                   animate={{ width: 384, opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden min-h-0"
+                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden h-full"
                 >
                   <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline cardPrompt={currentCardPrompt} />
                 </motion.div>
@@ -391,7 +413,7 @@ export default function Room() {
                   animate={{ width: 384, opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden min-h-0"
+                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden h-full"
                 >
                   <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline />
                 </motion.div>
@@ -426,6 +448,7 @@ export default function Room() {
         hostVisible={hostVisible}
         onSyncUpdate={poll}
         preshowPhase={preshowPhase}
+        onPhaseSkip={handlePhaseSkip}
       />
     </main>
   );

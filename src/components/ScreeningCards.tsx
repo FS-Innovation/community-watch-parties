@@ -3,24 +3,44 @@
 import { useState, useEffect, useRef } from "react";
 import gsap from "gsap";
 
-// 4 conversation cards — mix of perspectives, ~45 sec each
-const SCREENING_CARDS = [
-  { prompt: "When was the last time a day flew by and what were you doing?", author: "Payal Kadakia", image: "/cards/card-1-payal-kadakia.JPG" },
-  { prompt: "What did you learn from your greatest failure?", author: "Sir Richard Branson", image: "/cards/card-2-richard-branson.JPG" },
-  { prompt: "What are you clear about now that one year ago you didn't know?", author: "Chris Voss", image: "/cards/card-3-chris-voss.JPG" },
-  { prompt: "When was the last time you changed your mind about something life-changing?", author: "Africa Brooke", image: "/cards/card-4-africa-brooke.JPG" },
-];
+// All conversation cards by room
+const ROOM_CARDS: Record<string, { prompt: string; author: string; image: string }[]> = {
+  builder: [
+    { prompt: "When was the last time a day flew by and what were you doing?", author: "Payal Kadakia", image: "/cards/card-1-payal-kadakia.JPG" },
+    { prompt: "What did you learn from your greatest failure?", author: "Sir Richard Branson", image: "/cards/card-2-richard-branson.JPG" },
+  ],
+  storyteller: [
+    { prompt: "What are you clear about now that one year ago you didn't know?", author: "Chris Voss", image: "/cards/card-3-chris-voss.JPG" },
+    { prompt: "When was the last time you changed your mind about something life-changing?", author: "Africa Brooke", image: "/cards/card-4-africa-brooke.JPG" },
+  ],
+  explorer: [
+    { prompt: "What's something you believed for years that turned out to be wrong?", author: "Community", image: "/cards/card-5-community.JPG" },
+  ],
+};
 
-const CARD_DURATION = 45; // ~45 seconds per card
+// Builder room: 2 own cards + 2 mix-matched from other rooms + 1 wild card = 5
+function getCardsForRoom(room: string) {
+  const own = ROOM_CARDS[room] || ROOM_CARDS.builder;
+  const others = Object.entries(ROOM_CARDS)
+    .filter(([key]) => key !== room)
+    .flatMap(([, cards]) => cards);
+  // Take 2 own + up to 3 from others to reach 5
+  const mixCards = others.slice(0, 5 - own.length);
+  return [...own, ...mixCards];
+}
+
+const CARD_DURATION = 36; // ~36 seconds per card (5 cards × 36s = 3 min warmup phase)
 
 interface Props {
   eventId: string;
   viewerId: string;
+  room?: string;
   onAllDone?: () => void;
   onCardChange?: (prompt: string, author: string) => void;
 }
 
-export default function ScreeningCards({ eventId, viewerId, onAllDone, onCardChange }: Props) {
+export default function ScreeningCards({ eventId, viewerId, room = "builder", onAllDone, onCardChange }: Props) {
+  const SCREENING_CARDS = getCardsForRoom(room);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(CARD_DURATION);
   const [allDone, setAllDone] = useState(false);
