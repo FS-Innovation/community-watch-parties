@@ -34,6 +34,7 @@ export default function Room() {
   const [countdownDuration, setCountdownDuration] = useState(DEFAULT_COUNTDOWN);
   const [hostPanelOpen, setHostPanelOpen] = useState(true); // Everyone is a host for now
   const [arrived, setArrived] = useState(false); // tracks curtain reveal
+  const [currentCardPrompt, setCurrentCardPrompt] = useState<string | null>(null);
   const shownCardIds = useRef<Set<string>>(new Set());
   const autoStartedRef = useRef(false);
 
@@ -209,6 +210,10 @@ export default function Room() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  const handleCardPromptChange = useCallback((prompt: string) => {
+    setCurrentCardPrompt(prompt);
+  }, []);
+
   const handleReaction = useCallback((emoji: ReactionEmoji) => {
     fetch("/api/reactions", {
       method: "POST",
@@ -335,6 +340,7 @@ export default function Room() {
                 countdownStart={countdownStart}
                 countdownDuration={countdownDuration}
                 onComplete={handleSegmentComplete}
+                onCardChange={handleCardPromptChange}
               />
             </div>
             {/* Right: Chat (always available) */}
@@ -345,9 +351,9 @@ export default function Room() {
                   animate={{ width: 384, opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden"
+                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden min-h-0"
                 >
-                  <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline />
+                  <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline cardPrompt={currentCardPrompt} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -378,7 +384,7 @@ export default function Room() {
                   animate={{ width: 384, opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden"
+                  className="flex-shrink-0 border-l border-[var(--room-border)] flex flex-col bg-[var(--room-bg)] overflow-hidden min-h-0"
                 >
                   <ChatPanel eventId={eventId} isOpen={true} onToggle={() => setChatOpen(false)} inline />
                 </motion.div>

@@ -18,9 +18,10 @@ interface Props {
   isOpen: boolean;
   onToggle: () => void;
   inline?: boolean;
+  cardPrompt?: string | null;
 }
 
-export default function ChatPanel({ eventId, isOpen, onToggle, inline }: Props) {
+export default function ChatPanel({ eventId, isOpen, onToggle, inline, cardPrompt }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -112,7 +113,7 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline }: Props) 
   // Inline mode: renders as a flex column filling parent container
   if (inline) {
     return (
-      <div className="flex flex-col h-full w-96">
+      <div className="flex flex-col h-full w-96 min-h-0">
         {/* Header */}
         <div className="p-4 border-b border-[var(--room-border)] flex items-center justify-between flex-shrink-0">
           <div>
@@ -126,8 +127,18 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline }: Props) 
           </button>
         </div>
 
+        {/* Card prompt context — shows what the current conversation card is */}
+        {cardPrompt && (
+          <div className="px-4 py-3 border-b border-[var(--room-border)] flex-shrink-0 bg-[var(--room-surface)]">
+            <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-gold)] mb-1">Discussing</p>
+            <p className="text-xs text-[var(--room-text-secondary)] leading-relaxed italic">
+              &ldquo;{cardPrompt}&rdquo;
+            </p>
+          </div>
+        )}
+
         {/* Messages */}
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-3 space-y-3">
+        <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
           {messages.length === 0 && (
             <p className="text-xs text-[var(--room-text-muted)] text-center py-8">
               No messages yet. Say something...
@@ -169,7 +180,7 @@ export default function ChatPanel({ eventId, isOpen, onToggle, inline }: Props) 
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
               className="room-input flex-1 text-xs"
-              placeholder="Type a message..."
+              placeholder={cardPrompt ? "Share your thoughts..." : "Type a message..."}
               autoFocus
             />
             <button

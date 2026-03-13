@@ -53,6 +53,7 @@ interface Props {
   countdownStart: number | null;
   countdownDuration: number;
   onComplete: () => void;
+  onCardChange?: (prompt: string, author: string) => void;
 }
 
 interface SegmentResponse {
@@ -60,7 +61,7 @@ interface SegmentResponse {
   answer: string | string[];
 }
 
-export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart, countdownDuration, onComplete }: Props) {
+export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart, countdownDuration, onComplete, onCardChange }: Props) {
   const [displayName, setDisplayName] = useState("");
   const [currentStep, setCurrentStep] = useState(0);
   const [textAnswer, setTextAnswer] = useState("");
@@ -248,6 +249,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
             eventId={eventId}
             viewerId={viewerId}
             onAllDone={onComplete}
+            onCardChange={onCardChange}
           />
         </div>
       </div>

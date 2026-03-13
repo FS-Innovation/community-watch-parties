@@ -18,11 +18,11 @@ interface Props {
   viewerId: string;
   onRespond?: (prompt: string, answer: string) => void;
   onAllDone?: () => void;
+  onCardChange?: (prompt: string, author: string) => void;
 }
 
-export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone }: Props) {
+export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone, onCardChange }: Props) {
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
-  const [answer, setAnswer] = useState("");
   const [timeLeft, setTimeLeft] = useState(CARD_DURATION);
   const [allDone, setAllDone] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -65,6 +65,13 @@ export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone
     });
   }, [currentCardIndex, allDone]);
 
+  // Notify parent of current card prompt (for chat context)
+  useEffect(() => {
+    if (allDone) return;
+    const card = SCREENING_CARDS[currentCardIndex];
+    onCardChange?.(card.prompt, card.author);
+  }, [currentCardIndex, allDone, onCardChange]);
+
   // 3D tilt on hover
   useEffect(() => {
     if (!cardRef.current || allDone) return;
@@ -96,11 +103,6 @@ export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone
   }, [currentCardIndex, allDone]);
 
   const advanceCard = () => {
-    // Save any pending answer
-    if (answer.trim()) {
-      submitCurrentAnswer();
-    }
-
     if (currentCardIndex < SCREENING_CARDS.length - 1) {
       if (cardRef.current) {
         gsap.to(cardRef.current, {
@@ -111,42 +113,14 @@ export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone
           ease: "power2.in",
           onComplete: () => {
             setCurrentCardIndex((i) => i + 1);
-            setAnswer("");
           },
         });
       } else {
         setCurrentCardIndex((i) => i + 1);
-        setAnswer("");
       }
     } else {
       setAllDone(true);
     }
-  };
-
-  const submitCurrentAnswer = () => {
-    if (!answer.trim()) return;
-    const card = SCREENING_CARDS[currentCardIndex];
-
-    onRespond?.(card.prompt, answer.trim());
-
-    fetch("/api/icebreaker", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        event_id: eventId,
-        viewer_id: viewerId,
-        prompt: card.prompt,
-        answer: answer.trim(),
-        signal_type: "conversation_card",
-      }),
-    }).catch(() => {});
-  };
-
-  const handleSubmit = () => {
-    if (!answer.trim()) return;
-    submitCurrentAnswer();
-    setAnswer("");
-    advanceCard();
   };
 
   const formatTime = (seconds: number) => {
@@ -174,102 +148,69 @@ export default function ScreeningCards({ eventId, viewerId, onRespond, onAllDone
   }
 
   const card = SCREENING_CARDS[currentCardIndex];
-  const cardProgress = ((CARD_DURATION - timeLeft) / CARD_DURATION) * 100;
-
   return (
-    <div className="flex flex-col h-full p-4" style={{ perspective: "1200px" }}>
-      {/* Card progress header */}
-      <div className="mb-3 flex-shrink-0">
-        <div className="flex items-center justify-between text-[10px] text-[var(--room-text-muted)] mb-1.5">
-          <span className="tracking-[0.15em] uppercase">
-            Card {currentCardIndex + 1} of {SCREENING_CARDS.length}
-          </span>
-          <span className={`font-mono ${timeLeft <= 15 ? "text-[var(--room-red)]" : ""}`}>
-            {formatTime(timeLeft)}
-          </span>
-        </div>
-        <div className="h-1 bg-[var(--room-surface)] rounded-full overflow-hidden">
+    <div className="flex flex-col items-center justify-center h-full p-4" style={{ perspective: "1200px" }}>
+      {/* Minimal progress — card count + timer */}
+      <div className="mb-4 flex items-center gap-3 flex-shrink-0">
+        <span className="text-[10px] tracking-[0.15em] uppercase text-[var(--room-text-muted)]">
+          Card {currentCardIndex + 1} of {SCREENING_CARDS.length}
+        </span>
+        <span className={`text-[10px] font-mono ${timeLeft <= 15 ? "text-[var(--room-red)]" : "text-[var(--room-text-muted)]"}`}>
+          {formatTime(timeLeft)}
+        </span>
+      </div>
+
+      {/* Card dots */}
+      <div className="flex gap-1.5 justify-center mb-4 flex-shrink-0">
+        {SCREENING_CARDS.map((_, i) => (
           <div
-            className={`h-full rounded-full transition-all duration-1000 linear ${timeLeft <= 15 ? "bg-[var(--room-red)]" : "bg-[var(--room-accent)]"}`}
-            style={{ width: `${cardProgress}%` }}
+            key={i}
+            className={`w-1.5 h-1.5 rounded-full transition-all ${
+              i < currentCardIndex
+                ? "bg-[var(--room-accent)]"
+                : i === currentCardIndex
+                ? "bg-[var(--room-gold)] scale-125"
+                : "bg-[var(--room-surface)]"
+            }`}
           />
-        </div>
-        {/* Card dots */}
-        <div className="flex gap-1.5 justify-center mt-2">
-          {SCREENING_CARDS.map((_, i) => (
-            <div
-              key={i}
-              className={`w-1.5 h-1.5 rounded-full transition-all ${
-                i < currentCardIndex
-                  ? "bg-[var(--room-accent)]"
-                  : i === currentCardIndex
-                  ? "bg-[var(--room-gold)] scale-125"
-                  : "bg-[var(--room-surface)]"
-              }`}
-            />
-          ))}
+        ))}
+      </div>
+
+      {/* Card — just the image floating, no container */}
+      <div ref={cardRef} style={{ transformStyle: "preserve-3d" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={card.image}
+          alt={`${card.author}: ${card.prompt}`}
+          className="max-h-[340px] w-auto object-contain rounded-sm"
+          style={{ filter: "drop-shadow(0 8px 32px rgba(0,0,0,0.5))" }}
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
+            const fallback = (e.target as HTMLImageElement).nextElementSibling;
+            if (fallback) (fallback as HTMLElement).style.display = "block";
+          }}
+        />
+        {/* Text fallback if image fails */}
+        <div className="p-8 text-center max-w-md" style={{ display: "none" }}>
+          <p className="text-[9px] tracking-[0.25em] uppercase text-[var(--room-text-muted)] mb-4">
+            Conversation Cards
+          </p>
+          <p className="text-xl font-medium leading-relaxed mb-3 icebreaker-prompt">
+            {card.prompt}
+          </p>
+          <p className="text-xs text-[var(--room-text-muted)]">
+            — {card.author}
+          </p>
         </div>
       </div>
 
-      {/* Card */}
-      <div className="flex-1 min-h-0 overflow-y-auto" ref={cardRef} style={{ transformStyle: "preserve-3d" }}>
-        <div className="icebreaker-card overflow-hidden">
-          {/* Card image */}
-          <div className="relative w-full" style={{ maxHeight: "300px" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={card.image}
-              alt={`${card.author}: ${card.prompt}`}
-              className="w-full h-auto object-contain"
-              style={{ maxHeight: "300px" }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-                const fallback = (e.target as HTMLImageElement).nextElementSibling;
-                if (fallback) (fallback as HTMLElement).style.display = "block";
-              }}
-            />
-            {/* Text fallback */}
-            <div className="p-6 text-center" style={{ display: "none" }}>
-              <p className="text-[9px] tracking-[0.25em] uppercase text-[var(--room-text-muted)] mb-4">
-                Conversation Cards
-              </p>
-              <p className="text-lg font-medium leading-relaxed mb-2 icebreaker-prompt">
-                {card.prompt}
-              </p>
-              <p className="text-xs text-[var(--room-text-muted)]">
-                — {card.author}
-              </p>
-            </div>
-          </div>
-
-          {/* Input */}
-          <div className="p-4 space-y-2">
-            <input
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              className="room-input text-sm"
-              placeholder="Share your thoughts..."
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={handleSubmit}
-                disabled={!answer.trim()}
-                className="btn-accent flex-1 text-sm"
-              >
-                Share
-              </button>
-              <button
-                onClick={() => { setAnswer(""); advanceCard(); }}
-                className="btn-ghost text-sm px-3"
-              >
-                Skip
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Skip link — subtle, timer handles auto-advance */}
+      <button
+        onClick={advanceCard}
+        className="mt-4 text-[10px] text-[var(--room-text-muted)] hover:text-[var(--room-text)] transition-colors tracking-wider uppercase"
+      >
+        Next card
+      </button>
     </div>
   );
 }
