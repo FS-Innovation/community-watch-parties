@@ -151,7 +151,7 @@ export default function PreShowExperience({
 
             {/* ─── Cards Phase (warmup or skipped arrival) — card shown in chat panel ─── */}
             {showCards && (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center justify-center h-full gap-6">
                 {/* ScreeningCards runs hidden to drive timer + card change callbacks */}
                 <div className="hidden">
                   <ScreeningCards
@@ -160,6 +160,20 @@ export default function PreShowExperience({
                     onCardChange={onCardChange}
                   />
                 </div>
+
+                {/* Ambient message during warmup */}
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 3, delay: 1 }}
+                  className="text-sm text-[var(--room-text-muted)] opacity-40 tracking-wide"
+                >
+                  {timeLeft > 300
+                    ? "Welcome — the show is starting soon"
+                    : timeLeft > 120
+                      ? "The show is starting soon..."
+                      : "Almost time..."}
+                </motion.p>
               </div>
             )}
 
@@ -171,6 +185,14 @@ export default function PreShowExperience({
                   animate={{ opacity: 1 }}
                   transition={{ duration: 2 }}
                 >
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 0.3 }}
+                    transition={{ duration: 2 }}
+                    className="text-xs text-[var(--room-text-muted)] mb-6 tracking-wide"
+                  >
+                    The show is starting soon...
+                  </motion.p>
                   <p className="text-[10px] tracking-[0.3em] uppercase text-[var(--room-gold)] font-medium mb-4">
                     Get ready
                   </p>
