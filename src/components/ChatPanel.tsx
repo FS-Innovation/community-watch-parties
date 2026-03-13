@@ -106,28 +106,38 @@ export default function ChatPanel({
   // Inline mode: card + chat combined
   if (inline) {
     const showCard = cardImage && (phase === "warmup" || phase === "arrival");
+    const isDimmed = phase === "silence";
 
     return (
       <div
-        className="relative flex flex-col h-full w-full overflow-hidden"
-        style={{ background: "linear-gradient(165deg, #1a1a2e 0%, #0f0f17 55%, #12121e 100%)" }}
+        className="relative flex flex-col h-full w-full overflow-hidden transition-all duration-[2000ms]"
+        style={{
+          background: isDimmed
+            ? "linear-gradient(165deg, #0e0e18 0%, #08080d 55%, #0a0a12 100%)"
+            : "linear-gradient(165deg, #1a1a2e 0%, #0f0f17 55%, #12121e 100%)",
+          opacity: isDimmed ? 0.6 : 1,
+        }}
       >
-        {/* Left edge accent line */}
+        {/* Left edge accent — faded glow instead of hard line */}
         <div
-          className="absolute top-0 left-0 bottom-0 w-[2px] pointer-events-none"
-          style={{ background: "linear-gradient(180deg, #7c5cfc 0%, #a78bfa 50%, #7c5cfc 100%)" }}
+          className="absolute top-0 left-0 bottom-0 w-[1px] pointer-events-none transition-opacity duration-[2000ms]"
+          style={{
+            background: "linear-gradient(180deg, transparent 0%, rgba(167,139,250,0.25) 30%, rgba(167,139,250,0.15) 70%, transparent 100%)",
+            opacity: isDimmed ? 0.3 : 1,
+          }}
         />
 
         {/* Room name header */}
         {roomName && (
           <div className="flex-shrink-0 px-4 pt-4 pb-2">
-            <h2 className="text-sm font-semibold text-white/90">{roomName}</h2>
+            <p className="text-[10px] tracking-[0.15em] uppercase text-white/35">You&rsquo;re part of</p>
+            <h2 className="text-sm font-semibold text-white/90 mt-0.5">{roomName}</h2>
           </div>
         )}
 
         {/* Card image — hero content at top of chat */}
         {showCard && (
-          <div className="flex-shrink-0 p-4 pb-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="flex-shrink-0 p-4 pb-4">
             {/* Card count + timer */}
             <div className="flex items-center justify-between mb-2">
               <span className="text-[9px] tracking-[0.2em] uppercase font-semibold" style={{ color: "#a78bfa" }}>
@@ -179,9 +189,7 @@ export default function ChatPanel({
 
         {/* Text fallback if no image but has prompt */}
         {!showCard && cardPrompt && (
-          <div className="flex-shrink-0 px-4 py-3"
-            style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(167,139,250,0.06)" }}
-          >
+          <div className="flex-shrink-0 px-4 py-3">
             <p className="text-[9px] tracking-[0.2em] uppercase font-semibold mb-1.5" style={{ color: "#a78bfa" }}>
               Break the ice
             </p>
@@ -224,9 +232,7 @@ export default function ChatPanel({
         </div>
 
         {/* Input */}
-        <div className="relative p-3 flex-shrink-0"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
-        >
+        <div className="relative px-3 pb-3 pt-1 flex-shrink-0">
           {!nameSet && (
             <input
               value={displayName}
@@ -238,35 +244,30 @@ export default function ChatPanel({
                   setTimeout(() => inputRef.current?.focus(), 50);
                 }
               }}
-              className="w-full px-3 py-3 rounded-xl text-sm mb-2 outline-none transition-all text-white placeholder:text-white/35"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(124,92,252,0.5)"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
+              className="w-full px-4 py-3 rounded-2xl text-sm mb-2 outline-none transition-all text-white placeholder:text-white/30 border-none"
+              style={{ background: "rgba(255,255,255,0.06)" }}
               placeholder="Enter your name to chat..."
               autoFocus
             />
           )}
-          <div className="flex gap-2">
+          <div className="relative">
             <input
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              className="flex-1 px-3 py-3 rounded-xl text-sm outline-none transition-all text-white placeholder:text-white/35 disabled:opacity-25"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(124,92,252,0.5)"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
+              className="w-full px-4 py-3 pr-16 rounded-2xl text-sm outline-none transition-all text-white placeholder:text-white/30 disabled:opacity-25 border-none"
+              style={{ background: "rgba(255,255,255,0.06)" }}
               placeholder={nameSet ? (cardPrompt ? "Share your thoughts..." : "Type a message...") : "Set your name first..."}
               disabled={!nameSet}
             />
             <button
               onClick={sendMessage}
               disabled={!input.trim() || !nameSet}
-              className="px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all disabled:opacity-0 border-none"
               style={{
-                background: input.trim() && nameSet ? "rgba(124,92,252,0.4)" : "rgba(255,255,255,0.07)",
-                color: input.trim() && nameSet ? "white" : "rgba(255,255,255,0.4)",
-                border: `1px solid ${input.trim() && nameSet ? "rgba(124,92,252,0.35)" : "rgba(255,255,255,0.1)"}`,
+                background: input.trim() && nameSet ? "rgba(124,92,252,0.5)" : "transparent",
+                color: "rgba(255,255,255,0.8)",
               }}
             >
               Send
