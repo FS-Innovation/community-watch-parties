@@ -42,7 +42,7 @@ export default function HostControlsPanel({
           animate={{ y: 0 }}
           exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
-          className="fixed bottom-0 left-0 right-0 z-[55] bg-[var(--room-panel)] backdrop-blur-xl border-t border-[var(--room-border)] shadow-2xl"
+          className="z-[55] bg-[var(--room-panel)] backdrop-blur-xl border-t border-[var(--room-border)] shadow-2xl flex-shrink-0"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-2 border-b border-[var(--room-border)]">

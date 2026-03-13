@@ -22,7 +22,7 @@ function getCardsForRoom(room: string) {
   return ROOM_CARDS[room] || ROOM_CARDS.builder;
 }
 
-const CARD_DURATION = 90; // ~90 seconds per card (2 cards × 90s = 3 min warmup phase)
+const CARD_DURATION = 180; // ~3 min per card (2 cards × 3min = 6 min warmup phase)
 
 interface Props {
   eventId: string;
