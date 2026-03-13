@@ -6,36 +6,33 @@ import { getViewerName, setViewerName } from "@/lib/viewer";
 import gsap from "gsap";
 import ScreeningCards from "@/components/ScreeningCards";
 
-// Community segmentation questions — chatbot-style flow
-// These gather motivation, intent, segment, and routing preferences
+// 3 quick questions — just enough to match people, not enough to feel like a survey
 const SEGMENTATION_QUESTIONS = [
   {
     id: "motivation",
-    question: "What made you want to join the community screening tonight?",
-    placeholder: "I'm here because...",
+    question: "What brings you here tonight?",
+    placeholder: "I'm curious about...",
+    label: "quick intro",
     signal: "motivation + intent",
   },
   {
-    id: "desired_outcome",
-    question: "What would make this worth your time tonight?",
-    placeholder: "I'd love it if...",
-    signal: "desired outcome",
-  },
-  {
     id: "segment",
-    question: "Which kind of room feels most like you right now?",
+    question: "Where do you want to sit?",
+    subtitle: "We'll put you in a room with people who vibe the same way.",
     type: "multi-select" as const,
     options: [
-      { label: "Reflection", emoji: "🪞", description: "Meaning-seekers who go deep" },
-      { label: "Building", emoji: "🔨", description: "Builders creating something new" },
+      { label: "Reflection", emoji: "🪞", description: "Thinkers who go deep" },
+      { label: "Building", emoji: "🔨", description: "Makers building something new" },
       { label: "Creativity", emoji: "🎨", description: "Creatives exploring ideas" },
-      { label: "Connection", emoji: "🤝", description: "Connectors who bring people together" },
+      { label: "Connection", emoji: "🤝", description: "People-people who bring the energy" },
     ],
+    label: "find your crew",
     signal: "community segment",
   },
   {
     id: "future_screenings",
-    question: "What types of screenings would you love more of in the future?",
+    question: "What would you love to see more of?",
+    subtitle: "This helps us build screenings you actually want to show up to.",
     type: "multi-select" as const,
     options: [
       { label: "Founder stories", emoji: "🚀", description: "Startup journeys & lessons" },
@@ -43,6 +40,7 @@ const SEGMENTATION_QUESTIONS = [
       { label: "Mental health & growth", emoji: "🌱", description: "Wellbeing & self-development" },
       { label: "Live conversations", emoji: "🎙️", description: "Real-time Q&A with guests" },
     ],
+    label: "shape future screenings",
     signal: "content preference",
   },
 ];
@@ -71,6 +69,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
   const [phase, setPhase] = useState<"name" | "questions" | "processing" | "ready" | "picking" | "cards">("name");
   const [assignedSegment, setAssignedSegment] = useState<string | null>(null);
   const [placementMessage, setPlacementMessage] = useState<string | null>(null);
+  const [presenceCount, setPresenceCount] = useState(0);
   const stepRef = useRef<HTMLDivElement>(null);
 
   // Load saved name
@@ -78,6 +77,20 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
     const saved = getViewerName();
     if (saved) setDisplayName(saved);
   }, []);
+
+  // Fetch live presence count for social proof
+  useEffect(() => {
+    const fetchPresence = async () => {
+      try {
+        const res = await fetch(`/api/presence?event_id=${eventId}`);
+        const data = await res.json();
+        if (data.count) setPresenceCount(data.count);
+      } catch { /* ignore */ }
+    };
+    fetchPresence();
+    const interval = setInterval(fetchPresence, 15000);
+    return () => clearInterval(interval);
+  }, [eventId]);
 
   // Global countdown synced with server
   useEffect(() => {
@@ -239,7 +252,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
               {assignedSegment === "Building" && "🔨"}
               {assignedSegment === "Creativity" && "🎨"}
               {assignedSegment === "Connection" && "🤝"}
-              {" "}{assignedSegment} Room
+              {" "}{assignedSegment} Crew
             </span>
           )}
         </div>
@@ -278,12 +291,18 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
             className="text-center w-full max-w-md"
           >
             <p className="text-[10px] tracking-[0.3em] uppercase text-[var(--room-gold)] font-medium mb-6">
-              FlightStory Screenings
+              Community Screening
             </p>
-            <h1 className="text-2xl font-bold mb-2">Welcome to the Screening</h1>
-            <p className="text-sm text-[var(--room-text-secondary)] mb-8">
-              Before the show, we&apos;ll match you with the right interest group so you can connect with people who get you.
+            <h1 className="text-2xl font-bold mb-2">Find Your People</h1>
+            <p className="text-sm text-[var(--room-text-secondary)] mb-2">
+              3 quick questions and we&apos;ll seat you with people on your wavelength. You&apos;ll watch together, chat together, and actually connect.
             </p>
+            {presenceCount > 1 && (
+              <p className="text-xs text-[var(--room-text-muted)] mb-8">
+                {presenceCount} {presenceCount === 1 ? "person" : "others"} here right now
+              </p>
+            )}
+            {presenceCount <= 1 && <div className="mb-8" />}
             <div className="space-y-3">
               <input
                 value={displayName}
@@ -298,7 +317,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
                 disabled={!displayName.trim()}
                 className="btn-accent w-full text-sm py-3"
               >
-                Let&apos;s go
+                Find my crew
               </button>
             </div>
           </motion.div>
@@ -332,13 +351,20 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
             <div ref={stepRef}>
               {/* Question label */}
               <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-text-muted)] mb-3">
-                {currentQuestion.signal}
+                {currentQuestion.label || currentQuestion.signal}
               </p>
 
               {/* Question text */}
-              <h2 className="text-lg font-medium mb-6 leading-relaxed">
+              <h2 className="text-lg font-medium mb-2 leading-relaxed">
                 {currentQuestion.question}
               </h2>
+              {/* Subtitle explaining why we're asking */}
+              {"subtitle" in currentQuestion && currentQuestion.subtitle && (
+                <p className="text-xs text-[var(--room-text-muted)] mb-6">
+                  {currentQuestion.subtitle}
+                </p>
+              )}
+              {!("subtitle" in currentQuestion && currentQuestion.subtitle) && <div className="mb-4" />}
 
               {/* Text input questions — no skip */}
               {!currentQuestion.type && (
@@ -413,9 +439,9 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
               transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
               className="w-12 h-12 mx-auto mb-4 rounded-full border-2 border-[var(--room-accent)] border-t-transparent"
             />
-            <p className="text-lg font-medium mb-2">Finding your interest group</p>
+            <p className="text-lg font-medium mb-2">Finding your crew</p>
             <p className="text-sm text-[var(--room-text-secondary)]">
-              Matching you with people who share your vibe...
+              Matching you with people on your wavelength...
             </p>
           </motion.div>
         )}
@@ -444,7 +470,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
                 </div>
                 <div>
                   <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-text-muted)]">
-                    Your room
+                    Your crew
                   </p>
                   <p className="text-lg font-semibold text-[var(--room-text)]">
                     {assignedSegment}
@@ -462,8 +488,8 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
             >
               <p className="text-sm leading-relaxed text-[var(--room-text)]">
                 {placementMessage || (assignedSegment
-                  ? `Based on what you shared, we're taking you to the ${assignedSegment} room with others who share your energy. How does this sound?`
-                  : "We've found you a great spot for tonight's screening. How does this sound?"
+                  ? `You're headed to the ${assignedSegment} room — you'll be watching and chatting with people who think like you. Ready?`
+                  : "We found your crew for tonight's screening. You'll be watching together and chatting in real time. Ready?"
                 )}
               </p>
             </motion.div>
@@ -479,13 +505,13 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
                 onClick={() => setPhase("cards")}
                 className="btn-accent w-full text-sm py-3"
               >
-                Let&apos;s do it
+                Take me in
               </button>
               <button
                 onClick={() => setPhase("picking")}
                 className="btn-ghost w-full text-sm py-3"
               >
-                I&apos;d prefer a different room
+                Switch rooms
               </button>
               {globalTimeLeft > 0 && (
                 <p className="text-[11px] text-[var(--room-text-muted)] text-center">
@@ -506,10 +532,10 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
             className="w-full max-w-lg"
           >
             <p className="text-[9px] tracking-[0.2em] uppercase text-[var(--room-text-muted)] mb-3">
-              Pick your room
+              Pick your crew
             </p>
             <h2 className="text-lg font-medium mb-6 leading-relaxed">
-              No worries — which room feels more like you?
+              No worries — which crew feels more like you?
             </h2>
             <div className="grid grid-cols-2 gap-3 mb-4">
               {[
@@ -522,7 +548,7 @@ export default function CommunitySegmentFlow({ eventId, viewerId, countdownStart
                   key={seg.label}
                   onClick={() => {
                     setAssignedSegment(seg.label);
-                    setPlacementMessage(`You got it — switching you to the ${seg.label} room. See you in there!`);
+                    setPlacementMessage(`Switching you to the ${seg.label} crew — you'll be watching with them tonight.`);
                     setPhase("ready");
                   }}
                   className={`p-4 rounded-xl border text-left transition-all ${
