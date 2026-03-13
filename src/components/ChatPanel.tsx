@@ -108,7 +108,7 @@ export default function ChatPanel({
     return (
       <div
         className="relative flex flex-col h-full w-full overflow-hidden"
-        style={{ background: "#1e2030" }}
+        style={{ background: "linear-gradient(165deg, #1a1a2e 0%, #0f0f17 55%, #12121e 100%)" }}
       >
         {/* Left edge accent line */}
         <div
