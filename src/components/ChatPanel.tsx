@@ -25,13 +25,14 @@ interface Props {
   totalCards?: number;
   cardTimeLeft?: number;
   phase?: PreShowPhase | null;
+  roomName?: string;
 }
 
 export default function ChatPanel({
   eventId, isOpen, onToggle, inline,
   cardPrompt, cardImage, cardAuthor,
   cardIndex = 0, totalCards = 0, cardTimeLeft = 0,
-  phase,
+  phase, roomName,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -105,34 +106,34 @@ export default function ChatPanel({
     const showCard = cardImage && (phase === "warmup" || phase === "arrival");
 
     return (
-      <div
-        className="relative flex flex-col h-full w-full overflow-hidden"
-        style={{
-          background: "linear-gradient(180deg, rgba(30,32,45,0.98) 0%, rgba(22,24,35,0.97) 40%, rgba(18,20,30,0.98) 100%)",
-        }}
-      >
-        {/* Left edge glow line */}
+      <div className="relative flex flex-col h-full w-full overflow-hidden bg-white">
+        {/* Left edge accent line */}
         <div
           className="absolute top-0 left-0 bottom-0 w-[2px] pointer-events-none"
-          style={{ background: "linear-gradient(180deg, rgba(168,140,255,0.3) 0%, rgba(168,140,255,0.08) 50%, rgba(168,140,255,0.2) 100%)" }}
+          style={{ background: "linear-gradient(180deg, #7c5cfc 0%, #a78bfa 50%, #7c5cfc 100%)" }}
         />
+
+        {/* Room name header */}
+        {roomName && (
+          <div className="flex-shrink-0 px-4 pt-4 pb-2">
+            <h2 className="text-sm font-semibold text-gray-900">{roomName}</h2>
+          </div>
+        )}
 
         {/* Card image — hero content at top of chat */}
         {showCard && (
-          <div className="flex-shrink-0 p-4 pb-2">
+          <div className="flex-shrink-0 p-4 pb-2 border-b border-gray-100">
             {/* Card count + timer */}
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] tracking-[0.2em] uppercase font-semibold"
-                style={{ color: "rgba(168,140,255,0.9)" }}
-              >
+              <span className="text-[9px] tracking-[0.2em] uppercase font-semibold text-violet-600">
                 Break the ice
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] text-white/40 tracking-wider uppercase">
+                <span className="text-[9px] text-gray-400 tracking-wider uppercase">
                   {cardIndex + 1} of {totalCards}
                 </span>
                 {cardTimeLeft > 0 && totalCards > 1 && cardIndex < totalCards - 1 && (
-                  <span className="text-[9px] text-white/30 font-mono">
+                  <span className="text-[9px] text-gray-400 font-mono">
                     next in {formatTime(cardTimeLeft)}
                   </span>
                 )}
@@ -146,7 +147,7 @@ export default function ChatPanel({
               className="w-full rounded-lg object-contain"
               style={{
                 maxHeight: "240px",
-                filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.4))",
+                filter: "drop-shadow(0 2px 12px rgba(0,0,0,0.1))",
               }}
             />
           </div>
@@ -154,15 +155,11 @@ export default function ChatPanel({
 
         {/* Text fallback if no image but has prompt */}
         {!showCard && cardPrompt && (
-          <div className="flex-shrink-0 px-4 py-3 border-b border-white/[0.08]"
-            style={{ background: "rgba(168,140,255,0.06)" }}
-          >
-            <p className="text-[9px] tracking-[0.2em] uppercase font-semibold mb-1.5"
-              style={{ color: "rgba(168,140,255,0.9)" }}
-            >
+          <div className="flex-shrink-0 px-4 py-3 border-b border-gray-100 bg-violet-50">
+            <p className="text-[9px] tracking-[0.2em] uppercase font-semibold mb-1.5 text-violet-600">
               Break the ice
             </p>
-            <p className="text-[13px] text-white/80 leading-relaxed font-medium italic">
+            <p className="text-[13px] text-gray-700 leading-relaxed font-medium italic">
               &ldquo;{cardPrompt}&rdquo;
             </p>
           </div>
@@ -172,8 +169,8 @@ export default function ChatPanel({
         <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-6 gap-2">
-              <p className="text-sm text-white/50">No messages yet</p>
-              <p className="text-xs text-white/30">Be the first to say something</p>
+              <p className="text-sm text-gray-400">No messages yet</p>
+              <p className="text-xs text-gray-300">Be the first to say something</p>
             </div>
           )}
           {messages.map((msg) => (
@@ -181,17 +178,13 @@ export default function ChatPanel({
               key={msg.id}
               className={`text-sm ${msg.viewer_id === viewerId ? "text-right" : ""}`}
             >
-              <span className="text-[10px] text-white/50">{msg.display_name}</span>
+              <span className="text-[10px] text-gray-400">{msg.display_name}</span>
               <div
                 className={`mt-0.5 inline-block px-3 py-2 rounded-xl text-[13px] max-w-[85%] ${
                   msg.viewer_id === viewerId
-                    ? "rounded-br-sm text-white"
-                    : "rounded-bl-sm text-white/90"
+                    ? "rounded-br-sm text-white bg-violet-500"
+                    : "rounded-bl-sm text-gray-800 bg-gray-100"
                 }`}
-                style={msg.viewer_id === viewerId
-                  ? { background: "rgba(168,140,255,0.2)", border: "1px solid rgba(168,140,255,0.15)" }
-                  : { background: "rgba(255,255,255,0.08)" }
-                }
               >
                 {msg.text}
               </div>
@@ -201,9 +194,7 @@ export default function ChatPanel({
         </div>
 
         {/* Input */}
-        <div className="relative p-3 border-t border-white/[0.1] flex-shrink-0"
-          style={{ background: "rgba(255,255,255,0.03)" }}
-        >
+        <div className="relative p-3 border-t border-gray-100 flex-shrink-0 bg-gray-50/80">
           {!nameSet && (
             <input
               value={displayName}
@@ -215,10 +206,7 @@ export default function ChatPanel({
                   setTimeout(() => inputRef.current?.focus(), 50);
                 }
               }}
-              className="w-full px-3 py-3 rounded-xl text-sm mb-2 outline-none transition-all text-white placeholder:text-white/35"
-              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(168,140,255,0.4)"; e.currentTarget.style.boxShadow = "0 0 20px rgba(168,140,255,0.1)"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.boxShadow = "none"; }}
+              className="w-full px-3 py-3 rounded-xl text-sm mb-2 outline-none transition-all text-gray-900 placeholder:text-gray-400 bg-white border border-gray-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
               placeholder="Enter your name to chat..."
               autoFocus
             />
@@ -229,22 +217,18 @@ export default function ChatPanel({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              className="flex-1 px-3 py-3 rounded-xl text-sm outline-none transition-all text-white placeholder:text-white/35 disabled:opacity-25"
-              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(168,140,255,0.4)"; e.currentTarget.style.boxShadow = "0 0 20px rgba(168,140,255,0.1)"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.boxShadow = "none"; }}
+              className="flex-1 px-3 py-3 rounded-xl text-sm outline-none transition-all text-gray-900 placeholder:text-gray-400 disabled:opacity-30 bg-white border border-gray-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
               placeholder={nameSet ? (cardPrompt ? "Share your thoughts..." : "Type a message...") : "Set your name first..."}
               disabled={!nameSet}
             />
             <button
               onClick={sendMessage}
               disabled={!input.trim() || !nameSet}
-              className="px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-25 disabled:cursor-not-allowed"
-              style={{
-                background: input.trim() && nameSet ? "rgba(168,140,255,0.3)" : "rgba(255,255,255,0.1)",
-                color: input.trim() && nameSet ? "white" : "rgba(255,255,255,0.6)",
-                border: `1px solid ${input.trim() && nameSet ? "rgba(168,140,255,0.3)" : "rgba(255,255,255,0.1)"}`,
-              }}
+              className={`px-4 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-25 disabled:cursor-not-allowed ${
+                input.trim() && nameSet
+                  ? "bg-violet-500 text-white hover:bg-violet-600"
+                  : "bg-gray-100 text-gray-400 border border-gray-200"
+              }`}
             >
               Send
             </button>

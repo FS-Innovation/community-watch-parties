@@ -278,22 +278,6 @@ export default function Room() {
       {/* Cinema Curtains — dramatic open on arrival, never re-close during pre-show */}
       <CinemaCurtains isOpen={arrived} />
 
-      {/* Spotlight reveal overlay */}
-      <AnimatePresence>
-        {arrived && !segmentComplete && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.8 } }}
-            transition={{ duration: 1.5, delay: 0.3 }}
-            className="fixed inset-0 z-[50] pointer-events-none"
-            style={{
-              background: "radial-gradient(ellipse 60% 70% at center, transparent 0%, rgba(5,5,5,0.6) 60%, rgba(2,2,2,0.85) 100%)",
-            }}
-          />
-        )}
-      </AnimatePresence>
-
       {/* ─── Top Bar ─── */}
       <header className="flex items-center justify-between px-5 py-3 flex-shrink-0 bg-[var(--room-bg)] border-b border-[var(--room-border)] z-[40]">
         <div className="flex items-center gap-3">
@@ -410,6 +394,7 @@ export default function Room() {
                 isOpen={true}
                 onToggle={() => setChatOpen(false)}
                 inline
+                roomName="The Connection Room"
                 cardPrompt={currentCardPrompt}
                 cardImage={currentCardImage}
                 cardAuthor={currentCardAuthor}
