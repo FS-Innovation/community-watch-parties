@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import ActivityFeed from "@/components/ActivityFeed";
 import ThisOrThatGame from "@/components/ThisOrThatGame";
 import ReactionBar from "@/components/ReactionBar";
 import ChatPanel from "@/components/ChatPanel";
-import { getViewerId, getViewerName } from "@/lib/viewer";
+import { getViewerId, getViewerName, hydrateViewer } from "@/lib/viewer";
+import { decodeMagicToken } from "@/lib/magic-link";
 import type { ReactionEmoji, PreShowPhase } from "@/lib/types";
 
 const DEMO_EVENT_ID = "demo-event";
@@ -14,11 +15,57 @@ const DEMO_EVENT_ID = "demo-event";
 type MobileTab = "feed" | "chat" | "games";
 
 export default function MobileSecondScreen() {
-  const [eventId] = useState(DEMO_EVENT_ID);
+  const [eventId, setEventId] = useState(DEMO_EVENT_ID);
   const [eventStatus, setEventStatus] = useState("waiting");
   const [activeTab, setActiveTab] = useState<MobileTab>("feed");
   const [preshowPhase, setPreshowPhase] = useState<PreShowPhase>("arrival");
-  const viewerId = typeof window !== "undefined" ? getViewerId() : "";
+  const [viewerId, setViewerId] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [connectionRoom, setConnectionRoom] = useState("");
+  const [linked, setLinked] = useState(false);
+  const hydrated = useRef(false);
+
+  // Hydrate identity from magic link token on mount
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    if (token) {
+      const payload = decodeMagicToken(token);
+      if (payload) {
+        // Link this phone to the desktop viewer
+        hydrateViewer(payload.vid, payload.name, payload.eid, payload.room);
+        setViewerId(payload.vid);
+        setDisplayName(payload.name);
+        setEventId(payload.eid || DEMO_EVENT_ID);
+        setConnectionRoom(payload.room || "");
+        setLinked(true);
+
+        // Clean token from URL (cosmetic)
+        window.history.replaceState({}, "", "/mobile");
+
+        // Track the link in engagement
+        fetch("/api/engagement", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event_id: payload.eid || DEMO_EVENT_ID,
+            viewer_id: payload.vid,
+            metric_type: "second_screen_link",
+          }),
+        }).catch(() => {});
+
+        return;
+      }
+    }
+
+    // No token or invalid — use existing localStorage identity
+    setViewerId(getViewerId());
+    setDisplayName(getViewerName());
+  }, []);
 
   // Poll sync state
   const poll = useCallback(async () => {
@@ -72,10 +119,36 @@ export default function MobileSecondScreen() {
             )}
           </div>
         </div>
-        <span className="text-[8px] tracking-[0.15em] uppercase text-white/20 border border-white/10 px-2 py-0.5 rounded">
-          Second Screen
-        </span>
+        <div className="flex items-center gap-2">
+          {linked && displayName && (
+            <span className="text-[9px] text-white/40 px-2 py-0.5 rounded-full border border-white/10">
+              {displayName}
+            </span>
+          )}
+          <span className="text-[8px] tracking-[0.15em] uppercase text-white/20 border border-white/10 px-2 py-0.5 rounded">
+            Second Screen
+          </span>
+        </div>
       </header>
+
+      {/* Linked confirmation */}
+      <AnimatePresence>
+        {linked && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="flex-shrink-0 overflow-hidden"
+          >
+            <div className="px-4 py-2 text-center" style={{ background: "rgba(124,92,252,0.1)", borderBottom: "1px solid rgba(124,92,252,0.15)" }}>
+              <p className="text-[10px] text-white/60">
+                Linked to your screen as <span className="text-white/80 font-medium">{displayName || "Viewer"}</span>
+                {connectionRoom && <span className="text-white/40"> &middot; {connectionRoom}</span>}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Reactions (always visible during live) */}
       {eventStatus === "live" && (
@@ -96,7 +169,7 @@ export default function MobileSecondScreen() {
             isOpen={true}
             onToggle={() => {}}
             inline
-            roomName="The Connection Room"
+            roomName={connectionRoom || "The Connection Room"}
             phase={preshowPhase}
           />
         )}
@@ -113,7 +186,7 @@ export default function MobileSecondScreen() {
       </div>
 
       {/* Bottom tab bar */}
-      <nav className="flex-shrink-0 border-t border-[var(--room-border)] flex">
+      <nav className="flex-shrink-0 border-t border-[var(--room-border)] flex" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {tabs.map((tab) => (
           <button
             key={tab.id}

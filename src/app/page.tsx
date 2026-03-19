@@ -427,8 +427,13 @@ export default function Room() {
                 isVisible={showSpotify}
               />
 
-              {/* QR Code for second screen */}
-              <QRCodeSecondScreen isVisible={showQR} />
+              {/* QR Code for second screen — magic link with viewer identity */}
+              <QRCodeSecondScreen
+                isVisible={showQR}
+                viewerId={viewerId}
+                displayName={displayName}
+                eventId={eventId}
+              />
             </div>
           ) : (
             /* ─── Live Screening ─── */
