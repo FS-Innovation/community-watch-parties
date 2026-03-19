@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import WordCloud from "./WordCloud";
 import ScreeningReceipt from "./ScreeningReceipt";
 import ThisOrThatGame from "./ThisOrThatGame";
+import ShareReceipt from "./ShareReceipt";
 
 interface Props {
   eventId: string;
@@ -130,6 +131,13 @@ export default function AfterpartyExperience({ eventId, viewerId, viewerCount, d
               viewerId={viewerId}
               eventId={eventId}
               viewerCount={viewerCount}
+            />
+
+            {/* Share receipt */}
+            <ShareReceipt
+              episodeTitle="Behind The Diary"
+              viewerCount={viewerCount}
+              eventId={eventId}
             />
 
             <div className="text-center mt-6 space-y-3">

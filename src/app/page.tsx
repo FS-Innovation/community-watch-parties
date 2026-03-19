@@ -19,6 +19,10 @@ import ReactionPromptOverlay from "@/components/ReactionPromptOverlay";
 import QRCodeSecondScreen from "@/components/QRCodeSecondScreen";
 import ThisOrThatGame from "@/components/ThisOrThatGame";
 import AfterpartyExperience from "@/components/AfterpartyExperience";
+import AmbientLighting from "@/components/AmbientLighting";
+import ViewerCountTicker from "@/components/ViewerCountTicker";
+import QuestionSubmit from "@/components/QuestionSubmit";
+import HostIntroOverlay from "@/components/HostIntroOverlay";
 import type { SyncState, ConversationCard, HostLayout, ReactionEmoji, PreShowPhase } from "@/lib/types";
 import { PHASE_LABELS } from "@/lib/preshow";
 import { getViewerId, getViewerName } from "@/lib/viewer";
@@ -54,6 +58,7 @@ export default function Room() {
   const [preshowPhase, setPreshowPhase] = useState<PreShowPhase>("arrival");
   const [spotifyUrl, setSpotifyUrl] = useState<string | null>(null);
   const [viewerCount, setViewerCount] = useState(0);
+  const [showHostIntro, setShowHostIntro] = useState(false);
   const shownCardIds = useRef<Set<string>>(new Set());
   const autoStartedRef = useRef(false);
 
@@ -317,6 +322,9 @@ export default function Room() {
 
   return (
     <main className="h-screen w-screen flex flex-col overflow-hidden bg-[var(--room-bg)]">
+      {/* Ambient lighting — color shifts with phase */}
+      <AmbientLighting phase={preshowPhase} eventStatus={eventStatus} />
+
       <CinemaCurtains isOpen={arrived} />
 
       {/* ─── Top Bar ─── */}
@@ -434,6 +442,11 @@ export default function Room() {
                 displayName={displayName}
                 eventId={eventId}
               />
+
+              {/* Live viewer counter with milestone animations */}
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[15]">
+                <ViewerCountTicker eventId={eventId} isVisible={isPreShow} />
+              </div>
             </div>
           ) : (
             /* ─── Live Screening ─── */
@@ -443,6 +456,12 @@ export default function Room() {
                   playbackId={playbackId}
                   syncState={syncState}
                   onTimeUpdate={setCurrentTime}
+                />
+
+                {/* Host intro overlay (full-screen before video) */}
+                <HostIntroOverlay
+                  isVisible={showHostIntro}
+                  onComplete={() => setShowHostIntro(false)}
                 />
 
                 {/* Reaction prompts at pre-marked moments */}
@@ -461,6 +480,14 @@ export default function Room() {
 
                 <ReactionBar onReaction={handleReaction} />
               </div>
+
+              {/* Live question submission button */}
+              <QuestionSubmit
+                eventId={eventId}
+                viewerId={viewerId}
+                displayName={displayName}
+                isVisible={isLive}
+              />
             </div>
           )}
         </div>
