@@ -12,12 +12,21 @@ import PreShowExperience from "@/components/PreShowExperience";
 import PresenceCounter from "@/components/PresenceCounter";
 import ThemeToggle from "@/components/ThemeToggle";
 import HostControlsPanel from "@/components/HostControlsPanel";
+import ActivityFeed from "@/components/ActivityFeed";
+import SpotifyPlaylist from "@/components/SpotifyPlaylist";
+import AudiencePulse from "@/components/AudiencePulse";
+import ReactionPromptOverlay from "@/components/ReactionPromptOverlay";
+import QRCodeSecondScreen from "@/components/QRCodeSecondScreen";
+import ThisOrThatGame from "@/components/ThisOrThatGame";
+import AfterpartyExperience from "@/components/AfterpartyExperience";
 import type { SyncState, ConversationCard, HostLayout, ReactionEmoji, PreShowPhase } from "@/lib/types";
 import { PHASE_LABELS } from "@/lib/preshow";
-import { getViewerId } from "@/lib/viewer";
+import { getViewerId, getViewerName } from "@/lib/viewer";
 
 const DEMO_EVENT_ID = "demo-event";
-const DEFAULT_COUNTDOWN = 600; // 10 minutes (3 min arrival + 3 min cards + 3 min build + 1 min silence)
+const DEFAULT_COUNTDOWN = 600;
+
+type SidePanel = "chat" | "activity";
 
 export default function Room() {
   const [eventId] = useState(DEMO_EVENT_ID);
@@ -28,13 +37,14 @@ export default function Room() {
   const [hostLayout, setHostLayout] = useState<HostLayout>("pip");
   const [hostVisible, setHostVisible] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
-  const [chatOpen, setChatOpen] = useState(true); // Chat open by default
+  const [sidePanel, setSidePanel] = useState<SidePanel>("chat");
+  const [sidePanelOpen, setSidePanelOpen] = useState(true);
   const [curtainsOpen, setCurtainsOpen] = useState(false);
   const [segmentComplete, setSegmentComplete] = useState(false);
   const [countdownStart, setCountdownStart] = useState<number | null>(null);
   const [countdownDuration, setCountdownDuration] = useState(DEFAULT_COUNTDOWN);
-  const [hostPanelOpen, setHostPanelOpen] = useState(true); // Everyone is a host for now
-  const [arrived, setArrived] = useState(false); // tracks curtain reveal
+  const [hostPanelOpen, setHostPanelOpen] = useState(true);
+  const [arrived, setArrived] = useState(false);
   const [currentCardPrompt, setCurrentCardPrompt] = useState<string | null>(null);
   const [currentCardImage, setCurrentCardImage] = useState<string | null>(null);
   const [currentCardAuthor, setCurrentCardAuthor] = useState<string | null>(null);
@@ -42,10 +52,13 @@ export default function Room() {
   const [totalCards, setTotalCards] = useState(0);
   const [cardTimeLeft, setCardTimeLeft] = useState(0);
   const [preshowPhase, setPreshowPhase] = useState<PreShowPhase>("arrival");
+  const [spotifyUrl, setSpotifyUrl] = useState<string | null>(null);
+  const [viewerCount, setViewerCount] = useState(0);
   const shownCardIds = useRef<Set<string>>(new Set());
   const autoStartedRef = useRef(false);
 
   const viewerId = typeof window !== "undefined" ? getViewerId() : "";
+  const displayName = typeof window !== "undefined" ? getViewerName() : "";
 
   // ─── Poll sync state ───
   const poll = useCallback(async () => {
@@ -60,6 +73,7 @@ export default function Room() {
       if (data.countdown_duration) setCountdownDuration(data.countdown_duration);
       if (data.curtains_open !== undefined) setCurtainsOpen(data.curtains_open);
       if (data.playback_id) setPlaybackId(data.playback_id);
+      if (data.spotify_playlist_url) setSpotifyUrl(data.spotify_playlist_url);
     } catch { /* ignore */ }
   }, [eventId]);
 
@@ -69,7 +83,7 @@ export default function Room() {
     return () => clearInterval(interval);
   }, [poll]);
 
-  // ─── Fetch event info (playback ID) ───
+  // ─── Fetch event info ───
   useEffect(() => {
     async function loadEvent() {
       try {
@@ -83,9 +97,21 @@ export default function Room() {
     loadEvent();
   }, []);
 
-  // ─── Auto-start countdown when page loads ───
-  // If event is still "waiting", auto-trigger countdown so the 10-min
-  // pre-show timer starts immediately
+  // ─── Track presence for viewer count ───
+  useEffect(() => {
+    const loadCount = async () => {
+      try {
+        const res = await fetch(`/api/presence?event_id=${eventId}`);
+        const data = await res.json();
+        setViewerCount(data.count || 0);
+      } catch { /* ignore */ }
+    };
+    loadCount();
+    const interval = setInterval(loadCount, 10000);
+    return () => clearInterval(interval);
+  }, [eventId]);
+
+  // ─── Auto-start countdown ───
   useEffect(() => {
     if (eventStatus === "waiting" && !autoStartedRef.current) {
       autoStartedRef.current = true;
@@ -101,14 +127,12 @@ export default function Room() {
     }
   }, [eventStatus, eventId, poll]);
 
-  // ─── Auto-open curtains on arrive (brief dramatic delay) ───
+  // ─── Auto-open curtains ───
   useEffect(() => {
     if (arrived) return;
-    // Brief 1.5s delay for dramatic reveal, then open curtains
     const timer = setTimeout(() => {
       setArrived(true);
       setCurtainsOpen(true);
-      // Also tell the server curtains are open
       fetch("/api/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,29 +142,46 @@ export default function Room() {
     return () => clearTimeout(timer);
   }, [arrived, eventId]);
 
-  // ─── Late joiner: skip pre-show only if event was already live on first load ───
+  // ─── Track engagement: join event ───
+  useEffect(() => {
+    if (!viewerId) return;
+    fetch("/api/engagement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_id: eventId, viewer_id: viewerId, metric_type: "join" }),
+    }).catch(() => {});
+
+    // Post join to activity feed
+    fetch("/api/activity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_id: eventId,
+        type: "join",
+        viewer_id: viewerId,
+        display_name: displayName || "Someone",
+      }),
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Late joiner skip ───
   const initialStatusRef = useRef<string | null>(null);
   useEffect(() => {
     if (initialStatusRef.current === null && eventStatus !== "waiting") {
       initialStatusRef.current = eventStatus;
     }
-    // Only skip pre-show if the event was already live/ended when we FIRST loaded
-    if (initialStatusRef.current === "live" || initialStatusRef.current === "ended") {
+    if (initialStatusRef.current === "live" || initialStatusRef.current === "ended" || initialStatusRef.current === "afterparty") {
       setSegmentComplete(true);
     }
   }, [eventStatus]);
 
-  // ─── Auto-go-live when pre-show completes ───
+  // ─── Auto-go-live ───
   const handleSegmentComplete = useCallback(() => {
     setSegmentComplete(true);
-
-    // If countdown is still running, curtains show "enjoy the show"
-    // When countdown finishes, auto-go-live triggers below
-    // If countdown already finished, go live now
     if (countdownStart) {
       const elapsed = (Date.now() - countdownStart) / 1000;
       if (elapsed >= countdownDuration) {
-        // Countdown already done, go live immediately
         fetch("/api/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -156,9 +197,9 @@ export default function Room() {
     }
   }, [eventId, countdownStart, countdownDuration, poll]);
 
-  // ─── Auto-go-live when countdown finishes (if pre-show is done) ───
+  // ─── Auto-go-live on countdown finish ───
   useEffect(() => {
-    if (!countdownStart || !segmentComplete || eventStatus === "live" || eventStatus === "ended") return;
+    if (!countdownStart || !segmentComplete || eventStatus === "live" || eventStatus === "ended" || eventStatus === "afterparty") return;
 
     const checkCountdown = () => {
       const elapsed = (Date.now() - countdownStart) / 1000;
@@ -190,9 +231,7 @@ export default function Room() {
   useEffect(() => {
     async function checkCards() {
       try {
-        const res = await fetch(
-          `/api/cards?event_id=${eventId}&current_time=${Math.floor(currentTime)}`
-        );
+        const res = await fetch(`/api/cards?event_id=${eventId}&current_time=${Math.floor(currentTime)}`);
         const data = await res.json();
         if (data.card && !shownCardIds.current.has(data.card.id)) {
           shownCardIds.current.add(data.card.id);
@@ -204,11 +243,10 @@ export default function Room() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [Math.floor(currentTime / 5), eventId]);
 
-  // ─── Host controls keyboard shortcut (backtick) ───
+  // ─── Keyboard shortcut ───
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "`" && !e.ctrlKey && !e.metaKey) {
-        // Don't trigger if user is typing in an input
         if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
         e.preventDefault();
         setHostPanelOpen((prev) => !prev);
@@ -231,21 +269,17 @@ export default function Room() {
     setPreshowPhase(phase);
   }, []);
 
-  // Host: skip to a specific pre-show phase by adjusting countdown_start
-  // Phase boundaries: arrival(10:00-7:00), warmup(7:00-1:00), build(1:00-0:30), silence(0:30-0:00)
   const handlePhaseSkip = useCallback((targetPhase: PreShowPhase) => {
     const phaseTimeLeft: Record<string, number> = {
-      arrival: 500,  // 8:20 remaining (middle of arrival)
-      warmup: 210,   // 3:30 remaining (middle of warmup)
-      build: 50,     // 0:50 remaining (middle of build)
-      silence: 15,   // 0:15 remaining (middle of silence)
+      arrival: 500,
+      warmup: 210,
+      build: 50,
+      silence: 15,
     };
     const targetTimeLeft = phaseTimeLeft[targetPhase] ?? 300;
-    // countdownStart = now - (duration - targetTimeLeft) * 1000
     const newCountdownStart = Date.now() - (countdownDuration - targetTimeLeft) * 1000;
     setCountdownStart(newCountdownStart);
 
-    // Persist to server so it sticks across polls
     fetch("/api/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -257,9 +291,9 @@ export default function Room() {
     fetch("/api/reactions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event_id: eventId, viewer_id: viewerId, emoji }),
+      body: JSON.stringify({ event_id: eventId, viewer_id: viewerId, emoji, video_timestamp: currentTime }),
     }).catch(() => {});
-  }, [eventId, viewerId]);
+  }, [eventId, viewerId, currentTime]);
 
   const handleCardRespond = useCallback((cardId: string, value: string) => {
     fetch("/api/cards/respond", {
@@ -273,9 +307,16 @@ export default function Room() {
     setActiveCard(null);
   }, []);
 
+  const isPreShow = !segmentComplete;
+  const isLive = eventStatus === "live";
+  const isAfterparty = eventStatus === "afterparty";
+  const isEnded = eventStatus === "ended";
+  const showSpotify = isPreShow && (preshowPhase === "arrival" || preshowPhase === "warmup");
+  const showQR = isPreShow && preshowPhase === "arrival";
+  const showThisOrThat = isPreShow && (preshowPhase === "warmup" || preshowPhase === "arrival");
+
   return (
     <main className="h-screen w-screen flex flex-col overflow-hidden bg-[var(--room-bg)]">
-      {/* Cinema Curtains — dramatic open on arrival, never re-close during pre-show */}
       <CinemaCurtains isOpen={arrived} />
 
       {/* ─── Top Bar ─── */}
@@ -284,7 +325,7 @@ export default function Room() {
           <span className="text-xs tracking-[0.15em] uppercase text-[var(--room-accent)] font-semibold">
             FlightStory
           </span>
-          {eventStatus === "live" && (
+          {isLive && (
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
               <span className="w-1.5 h-1.5 rounded-full bg-white/60" style={{ animation: "pulse-dot 1.5s infinite" }} />
               <span className="text-[11px] text-white/60 font-medium tracking-wider">LIVE</span>
@@ -296,43 +337,48 @@ export default function Room() {
           {eventStatus === "waiting" && (
             <span className="text-xs text-[var(--room-text-muted)]">Starting...</span>
           )}
-          {eventStatus === "ended" && (
+          {isAfterparty && (
+            <span className="text-xs text-[var(--room-gold)]">Afterparty</span>
+          )}
+          {isEnded && (
             <span className="text-xs text-[var(--room-text-muted)]">Ended</span>
           )}
         </div>
         <div className="flex items-center gap-3">
           <PresenceCounter eventId={eventId} />
           <ThemeToggle />
-          {/* Camera toggle — reserved for Q&A phase */}
-          {false && (
-            <button
-              onClick={() => setHostVisible(!hostVisible)}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                hostVisible
-                  ? "bg-[var(--room-green)] text-white"
-                  : "bg-[var(--room-surface)] text-[var(--room-text-muted)] hover:text-[var(--room-text)]"
-              }`}
-              title={hostVisible ? "Turn off camera" : "Go on stage"}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </button>
-          )}
+
+          {/* Side panel toggle: Chat */}
           <button
-            onClick={() => setChatOpen(!chatOpen)}
+            onClick={() => { setSidePanel("chat"); setSidePanelOpen(!sidePanelOpen || sidePanel !== "chat"); }}
             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-              chatOpen
+              sidePanelOpen && sidePanel === "chat"
                 ? "bg-[var(--room-accent)] text-white"
                 : "bg-[var(--room-surface)] text-[var(--room-text-muted)] hover:text-[var(--room-text)]"
             }`}
-            title="Toggle Chat"
+            title="Chat"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           </button>
-          {/* Host controls toggle */}
+
+          {/* Side panel toggle: Activity Feed */}
+          <button
+            onClick={() => { setSidePanel("activity"); setSidePanelOpen(!sidePanelOpen || sidePanel !== "activity"); }}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+              sidePanelOpen && sidePanel === "activity"
+                ? "bg-[var(--room-accent)] text-white"
+                : "bg-[var(--room-surface)] text-[var(--room-text-muted)] hover:text-[var(--room-text)]"
+            }`}
+            title="Activity Feed"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </button>
+
+          {/* Host controls */}
           <button
             onClick={() => setHostPanelOpen(!hostPanelOpen)}
             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
@@ -352,19 +398,40 @@ export default function Room() {
 
       {/* ─── Main Content ─── */}
       <div className="flex flex-1 min-h-0">
-        {/* Left: Cinema / Pre-show area (dark) */}
-        <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
-          {!segmentComplete ? (
-            <PreShowExperience
+        {/* Left: Cinema / Pre-show / Afterparty */}
+        <div className="flex-1 min-h-0 min-w-0 overflow-hidden relative">
+          {isAfterparty || (isEnded && segmentComplete) ? (
+            /* ─── Afterparty Experience ─── */
+            <AfterpartyExperience
               eventId={eventId}
               viewerId={viewerId}
-              countdownStart={countdownStart}
-              countdownDuration={countdownDuration}
-              onComplete={handleSegmentComplete}
-              onCardChange={handleCardPromptChange}
-              onPhaseChange={handlePhaseChange}
+              viewerCount={viewerCount}
+              displayName={displayName}
             />
+          ) : !segmentComplete ? (
+            /* ─── Pre-Show ─── */
+            <div className="relative w-full h-full">
+              <PreShowExperience
+                eventId={eventId}
+                viewerId={viewerId}
+                countdownStart={countdownStart}
+                countdownDuration={countdownDuration}
+                onComplete={handleSegmentComplete}
+                onCardChange={handleCardPromptChange}
+                onPhaseChange={handlePhaseChange}
+              />
+
+              {/* Spotify Playlist in lobby */}
+              <SpotifyPlaylist
+                playlistUrl={spotifyUrl}
+                isVisible={showSpotify}
+              />
+
+              {/* QR Code for second screen */}
+              <QRCodeSecondScreen isVisible={showQR} />
+            </div>
           ) : (
+            /* ─── Live Screening ─── */
             <div className="flex flex-col h-full p-4">
               <div className="relative flex-1">
                 <VideoPlayer
@@ -372,15 +439,30 @@ export default function Room() {
                   syncState={syncState}
                   onTimeUpdate={setCurrentTime}
                 />
+
+                {/* Reaction prompts at pre-marked moments */}
+                <ReactionPromptOverlay
+                  eventId={eventId}
+                  viewerId={viewerId}
+                  currentTime={currentTime}
+                  isLive={isLive}
+                />
+
+                {/* Audience pulse glow bar */}
+                <AudiencePulse
+                  eventId={eventId}
+                  isVisible={isLive}
+                />
+
                 <ReactionBar onReaction={handleReaction} />
               </div>
             </div>
           )}
         </div>
 
-        {/* Right: Chat panel — OUTSIDE the cinema, always bright */}
+        {/* Right: Side Panel (Chat or Activity Feed) */}
         <AnimatePresence>
-          {chatOpen && (
+          {sidePanelOpen && (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: 384, opacity: 1 }}
@@ -389,33 +471,41 @@ export default function Room() {
               className="flex-shrink-0 flex flex-col overflow-hidden relative z-10"
               style={{ height: "100%" }}
             >
-              <ChatPanel
-                eventId={eventId}
-                isOpen={true}
-                onToggle={() => setChatOpen(false)}
-                inline
-                roomName="The Connection Room"
-                cardPrompt={currentCardPrompt}
-                cardImage={currentCardImage}
-                cardAuthor={currentCardAuthor}
-                cardIndex={currentCardIndex}
-                totalCards={totalCards}
-                cardTimeLeft={cardTimeLeft}
-                phase={preshowPhase}
-              />
+              {sidePanel === "chat" ? (
+                <ChatPanel
+                  eventId={eventId}
+                  isOpen={true}
+                  onToggle={() => setSidePanelOpen(false)}
+                  inline
+                  roomName="The Connection Room"
+                  cardPrompt={currentCardPrompt}
+                  cardImage={currentCardImage}
+                  cardAuthor={currentCardAuthor}
+                  cardIndex={currentCardIndex}
+                  totalCards={totalCards}
+                  cardTimeLeft={cardTimeLeft}
+                  phase={preshowPhase}
+                />
+              ) : (
+                <div className="h-full flex flex-col" style={{
+                  background: "linear-gradient(165deg, #1a1a2e 0%, #0f0f17 55%, #12121e 100%)",
+                }}>
+                  <ActivityFeed eventId={eventId} />
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Conversation Card Overlay (legacy server-triggered cards) */}
+      {/* Conversation Card Overlay */}
       <ConversationCardOverlay
         card={activeCard}
         onRespond={handleCardRespond}
         onDismiss={handleCardDismiss}
       />
 
-      {/* Host Controls Panel (collapsible) */}
+      {/* Host Controls Panel */}
       <HostControlsPanel
         eventId={eventId}
         isOpen={hostPanelOpen}
